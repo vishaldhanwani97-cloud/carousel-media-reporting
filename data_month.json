@@ -11,16 +11,16 @@
     "cpc": 13.5,
     "landing_views": 81204,
     "cost_per_landing_view": 23.45,
-    "add_to_cart": 8311,
-    "cost_per_atc": 229.08,
-    "initiate_checkout": 6442,
-    "cost_per_initiate_checkout": 295.55,
-    "conversions": 2726,
-    "revenue": 2868144.39,
+    "add_to_cart": 8316,
+    "cost_per_atc": 228.95,
+    "initiate_checkout": 6447,
+    "cost_per_initiate_checkout": 295.32,
+    "conversions": 2744,
+    "revenue": 2892683.29,
     "revenue_source": "shopify",
-    "shopify_orders": 2726,
-    "roas": 1.51,
-    "cac": 698.43
+    "shopify_orders": 2744,
+    "roas": 1.52,
+    "cac": 693.85
   },
   "campaigns": [
     {
@@ -83,10 +83,10 @@
       "cost_per_landing_view": 19.75,
       "atc": 324,
       "cost_per_atc": 219.91,
-      "initiate_checkout": 239,
-      "cost_per_initiate_checkout": 298.12,
+      "initiate_checkout": 242,
+      "cost_per_initiate_checkout": 294.43,
       "atc_abandon_rate": 68.2,
-      "checkout_abandon_rate": 56.9,
+      "checkout_abandon_rate": 57.4,
       "purchases": 103,
       "revenue": 120206.12,
       "roas": 1.69,
@@ -97,15 +97,15 @@
         "link_clicks": 4704,
         "landing_views": 3607,
         "add_to_cart": 324,
-        "initiate_checkout": 239,
+        "initiate_checkout": 242,
         "purchases": 103,
         "dropoffs": {
           "impressions_to_link_clicks": 0.87,
           "link_clicks_to_landing": 76.7,
           "landing_to_cart": 9.0,
-          "cart_to_checkout": 73.8,
+          "cart_to_checkout": 74.7,
           "cart_to_purchase": 31.8,
-          "checkout_to_purchase": 43.1
+          "checkout_to_purchase": 42.6
         }
       }
     },
@@ -1126,10 +1126,10 @@
       "cost_per_landing_view": 22.94,
       "atc": 53,
       "cost_per_atc": 220.27,
-      "initiate_checkout": 47,
-      "cost_per_initiate_checkout": 248.39,
+      "initiate_checkout": 50,
+      "cost_per_initiate_checkout": 233.49,
       "atc_abandon_rate": 64.2,
-      "checkout_abandon_rate": 59.6,
+      "checkout_abandon_rate": 62.0,
       "purchases": 19,
       "cac": 614.45,
       "age": "18\u201365",
@@ -2170,16 +2170,6 @@
   ],
   "spendTrend": [
     {
-      "day": "04-25",
-      "spend": 97930.39,
-      "impressions": 1104988,
-      "link_clicks": 6482,
-      "purchases": 179,
-      "revenue": 206853.03,
-      "cac": 547.1,
-      "roas": 2.11
-    },
-    {
       "day": "04-26",
       "spend": 132676.85,
       "impressions": 1002538,
@@ -2448,6 +2438,16 @@
       "revenue": 5126.7,
       "cac": 0.0,
       "roas": 0
+    },
+    {
+      "day": "05-23",
+      "spend": 0.0,
+      "impressions": 0,
+      "link_clicks": 0,
+      "purchases": 1,
+      "revenue": 1030.0,
+      "cac": 0.0,
+      "roas": 0
     }
   ],
   "audienceAge": [
@@ -2495,12 +2495,12 @@
       "reach": 660554,
       "clicks": 30284,
       "spend": 490017.07,
-      "purchases": 625,
-      "revenue": 619159.3099999999,
+      "purchases": 626,
+      "revenue": 620189.31,
       "frequency": 9.65,
       "count": 3,
-      "cac": 784.03,
-      "roas": 1.26,
+      "cac": 782.77,
+      "roas": 1.27,
       "avg_frequency": 3.22
     },
     {
@@ -2555,11 +2555,11 @@
       "impressions": 9103561,
       "spend": 611410.07,
       "purchases": 0,
-      "revenue": 87538.1,
-      "shopify_orders": 88,
+      "revenue": 77565.0,
+      "shopify_orders": 77,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.14,
+      "roas": 0.13,
       "ctr": 0.5
     },
     {
@@ -2569,11 +2569,11 @@
       "impressions": 2526033,
       "spend": 200877.43,
       "purchases": 0,
-      "revenue": 19224.0,
-      "shopify_orders": 20,
+      "revenue": 23027.52,
+      "shopify_orders": 22,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.1,
+      "roas": 0.11,
       "ctr": 0.84
     },
     {
@@ -2583,11 +2583,11 @@
       "impressions": 903621,
       "spend": 166704.44,
       "purchases": 0,
-      "revenue": 18124.05,
+      "revenue": 19485.89,
       "shopify_orders": 21,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.11,
+      "roas": 0.12,
       "ctr": 1.13
     },
     {
@@ -2597,11 +2597,11 @@
       "impressions": 515392,
       "spend": 146859.39,
       "purchases": 0,
-      "revenue": 16927.0,
-      "shopify_orders": 17,
+      "revenue": 18492.1,
+      "shopify_orders": 19,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.12,
+      "roas": 0.13,
       "ctr": 1.52
     },
     {
@@ -2611,11 +2611,11 @@
       "impressions": 493367,
       "spend": 94982.57,
       "purchases": 0,
-      "revenue": 13250.55,
-      "shopify_orders": 14,
+      "revenue": 14250.55,
+      "shopify_orders": 16,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.14,
+      "roas": 0.15,
       "ctr": 1.1
     },
     {
@@ -2625,11 +2625,11 @@
       "impressions": 701475,
       "spend": 84632.01,
       "purchases": 0,
-      "revenue": 9609.44,
-      "shopify_orders": 10,
+      "revenue": 12338.44,
+      "shopify_orders": 13,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.11,
+      "roas": 0.15,
       "ctr": 0.84
     },
     {
@@ -2639,11 +2639,11 @@
       "impressions": 1326027,
       "spend": 83072.36,
       "purchases": 0,
-      "revenue": 16264.67,
-      "shopify_orders": 12,
+      "revenue": 10280.57,
+      "shopify_orders": 8,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.2,
+      "roas": 0.12,
       "ctr": 0.62
     },
     {
@@ -2653,11 +2653,11 @@
       "impressions": 499400,
       "spend": 81342.73,
       "purchases": 0,
-      "revenue": 6463.0,
-      "shopify_orders": 7,
+      "revenue": 13746.0,
+      "shopify_orders": 12,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.08,
+      "roas": 0.17,
       "ctr": 0.9
     },
     {
@@ -2681,11 +2681,11 @@
       "impressions": 871144,
       "spend": 59357.05,
       "purchases": 0,
-      "revenue": 3830.0,
+      "revenue": 4130.0,
       "shopify_orders": 5,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.06,
+      "roas": 0.07,
       "ctr": 0.6
     },
     {
@@ -2695,11 +2695,11 @@
       "impressions": 324899,
       "spend": 34743.72,
       "purchases": 0,
-      "revenue": 5884.5,
-      "shopify_orders": 8,
+      "revenue": 7339.5,
+      "shopify_orders": 9,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.17,
+      "roas": 0.21,
       "ctr": 0.81
     },
     {
@@ -2765,11 +2765,11 @@
       "impressions": 113512,
       "spend": 8754.88,
       "purchases": 0,
-      "revenue": 630.0,
-      "shopify_orders": 1,
+      "revenue": 2255.2,
+      "shopify_orders": 2,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.07,
+      "roas": 0.26,
       "ctr": 0.64
     },
     {
@@ -2779,11 +2779,11 @@
       "impressions": 17099,
       "spend": 2995.9,
       "purchases": 0,
-      "revenue": 0.0,
-      "shopify_orders": 0,
-      "revenue_source": "meta_pixel",
+      "revenue": 630.0,
+      "shopify_orders": 1,
+      "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.0,
+      "roas": 0.21,
       "ctr": 1.04
     },
     {
@@ -2807,11 +2807,11 @@
       "impressions": 12947,
       "spend": 1363.01,
       "purchases": 0,
-      "revenue": 0.0,
-      "shopify_orders": 0,
-      "revenue_source": "meta_pixel",
+      "revenue": 1030.0,
+      "shopify_orders": 1,
+      "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.0,
+      "roas": 0.76,
       "ctr": 1.1
     },
     {
@@ -3068,11 +3068,11 @@
       "impressions": 31535,
       "clicks": 6954,
       "reach": 4544,
-      "purchases": 14,
-      "revenue": 12456.0,
-      "cac": 653.66,
+      "purchases": 15,
+      "revenue": 13486.0,
+      "cac": 610.09,
       "ctr": 22.05,
-      "roas": 1.36
+      "roas": 1.47
     },
     {
       "platform": "audience_network",
@@ -3273,155 +3273,155 @@
   "hours": [
     {
       "hour": "00",
-      "spend": 49569.83,
-      "impressions": 513132,
-      "clicks": 4169,
-      "purchases": 18,
-      "cac": 2753.88
+      "spend": 42098.26,
+      "impressions": 426192,
+      "clicks": 3656,
+      "purchases": 16,
+      "cac": 2631.14
     },
     {
       "hour": "01",
-      "spend": 13344.88,
-      "impressions": 121119,
-      "clicks": 805,
-      "purchases": 11,
-      "cac": 1213.17
+      "spend": 11786.11,
+      "impressions": 100012,
+      "clicks": 707,
+      "purchases": 9,
+      "cac": 1309.57
     },
     {
       "hour": "02",
-      "spend": 4433.21,
-      "impressions": 44708,
-      "clicks": 288,
-      "purchases": 7,
-      "cac": 633.32
+      "spend": 3763.88,
+      "impressions": 35494,
+      "clicks": 249,
+      "purchases": 5,
+      "cac": 752.78
     },
     {
       "hour": "03",
-      "spend": 2191.8,
-      "impressions": 18415,
-      "clicks": 116,
+      "spend": 1684.26,
+      "impressions": 14142,
+      "clicks": 96,
       "purchases": 1,
-      "cac": 2191.8
+      "cac": 1684.26
     },
     {
       "hour": "04",
-      "spend": 1141.39,
-      "impressions": 8321,
-      "clicks": 71,
+      "spend": 719.64,
+      "impressions": 5411,
+      "clicks": 45,
       "purchases": 2,
-      "cac": 570.7
+      "cac": 359.82
     },
     {
       "hour": "05",
-      "spend": 1791.13,
-      "impressions": 11390,
-      "clicks": 91,
+      "spend": 1127.38,
+      "impressions": 7424,
+      "clicks": 50,
       "purchases": 1,
-      "cac": 1791.13
+      "cac": 1127.38
     },
     {
       "hour": "06",
-      "spend": 3116.84,
-      "impressions": 26158,
-      "clicks": 160,
-      "purchases": 8,
-      "cac": 389.61
+      "spend": 1871.28,
+      "impressions": 17771,
+      "clicks": 89,
+      "purchases": 6,
+      "cac": 311.88
     },
     {
       "hour": "07",
-      "spend": 5413.03,
-      "impressions": 45641,
-      "clicks": 263,
-      "purchases": 6,
-      "cac": 902.17
+      "spend": 3239.0,
+      "impressions": 29763,
+      "clicks": 161,
+      "purchases": 4,
+      "cac": 809.75
     },
     {
       "hour": "08",
-      "spend": 8546.38,
-      "impressions": 72572,
-      "clicks": 374,
-      "purchases": 11,
-      "cac": 776.94
+      "spend": 4989.76,
+      "impressions": 41326,
+      "clicks": 228,
+      "purchases": 7,
+      "cac": 712.82
     },
     {
       "hour": "09",
-      "spend": 11062.99,
-      "impressions": 93072,
-      "clicks": 560,
-      "purchases": 13,
-      "cac": 851.0
+      "spend": 6515.62,
+      "impressions": 54402,
+      "clicks": 331,
+      "purchases": 10,
+      "cac": 651.56
     },
     {
       "hour": "10",
-      "spend": 13007.6,
-      "impressions": 101277,
-      "clicks": 725,
-      "purchases": 22,
-      "cac": 591.25
+      "spend": 7489.77,
+      "impressions": 59018,
+      "clicks": 451,
+      "purchases": 14,
+      "cac": 534.98
     },
     {
       "hour": "11",
-      "spend": 15164.4,
-      "impressions": 114557,
-      "clicks": 848,
-      "purchases": 22,
-      "cac": 689.29
+      "spend": 8442.73,
+      "impressions": 63608,
+      "clicks": 478,
+      "purchases": 9,
+      "cac": 938.08
     },
     {
       "hour": "12",
-      "spend": 14640.88,
-      "impressions": 130562,
-      "clicks": 933,
-      "purchases": 20,
-      "cac": 732.04
+      "spend": 8154.9,
+      "impressions": 76086,
+      "clicks": 528,
+      "purchases": 15,
+      "cac": 543.66
     },
     {
       "hour": "13",
-      "spend": 14542.75,
-      "impressions": 136418,
-      "clicks": 1004,
-      "purchases": 18,
-      "cac": 807.93
+      "spend": 8570.34,
+      "impressions": 75807,
+      "clicks": 579,
+      "purchases": 8,
+      "cac": 1071.29
     },
     {
       "hour": "14",
-      "spend": 24677.44,
-      "impressions": 354385,
-      "clicks": 2576,
-      "purchases": 21,
-      "cac": 1175.12
+      "spend": 18111.68,
+      "impressions": 286288,
+      "clicks": 2035,
+      "purchases": 13,
+      "cac": 1393.21
     },
     {
       "hour": "15",
-      "spend": 63086.91,
-      "impressions": 1250298,
-      "clicks": 8777,
-      "purchases": 47,
-      "cac": 1342.27
+      "spend": 55732.22,
+      "impressions": 1182379,
+      "clicks": 8244,
+      "purchases": 32,
+      "cac": 1741.63
     },
     {
       "hour": "16",
-      "spend": 21943.36,
-      "impressions": 236459,
-      "clicks": 1458,
-      "purchases": 36,
-      "cac": 609.54
+      "spend": 16383.91,
+      "impressions": 175327,
+      "clicks": 1086,
+      "purchases": 30,
+      "cac": 546.13
     },
     {
       "hour": "17",
-      "spend": 17383.88,
-      "impressions": 153570,
+      "spend": 17382.99,
+      "impressions": 153569,
       "clicks": 1010,
-      "purchases": 23,
-      "cac": 755.82
+      "purchases": 22,
+      "cac": 790.14
     },
     {
       "hour": "18",
       "spend": 15988.11,
       "impressions": 147458,
       "clicks": 1007,
-      "purchases": 19,
-      "cac": 841.48
+      "purchases": 18,
+      "cac": 888.23
     },
     {
       "hour": "19",
@@ -3452,8 +3452,8 @@
       "spend": 18058.24,
       "impressions": 201300,
       "clicks": 1265,
-      "purchases": 24,
-      "cac": 752.43
+      "purchases": 23,
+      "cac": 785.14
     },
     {
       "hour": "23",
@@ -3465,16 +3465,16 @@
     }
   ],
   "pacing": {
-    "days_elapsed": 23,
-    "days_remaining": 7,
+    "days_elapsed": 24,
+    "days_remaining": 6,
     "spend_to_date": 1903911.48,
-    "daily_avg": 82778.76,
-    "projected_month": 2483362.8,
-    "purchases_to_date": 2726,
-    "projected_purchases": 3556,
-    "projected_cac": 698.43
+    "daily_avg": 79329.65,
+    "projected_month": 2379889.5,
+    "purchases_to_date": 2744,
+    "projected_purchases": 3430,
+    "projected_cac": 693.85
   },
-  "lastUpdated": "2026-05-23 10:03 IST",
+  "lastUpdated": "2026-05-24 10:28 IST",
   "dateRange": "this_month",
   "shopify_connected": true
 }
