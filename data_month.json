@@ -16,7 +16,7 @@
     "initiate_checkout": 6453,
     "cost_per_initiate_checkout": 295.04,
     "conversions": 2825,
-    "revenue": 2990871.08,
+    "revenue": 2995512.18,
     "revenue_source": "shopify",
     "shopify_orders": 2825,
     "roas": 1.57,
@@ -2170,16 +2170,6 @@
   ],
   "spendTrend": [
     {
-      "day": "05-01",
-      "spend": 117120.85,
-      "impressions": 1076943,
-      "link_clicks": 7691,
-      "purchases": 197,
-      "revenue": 204639.28,
-      "cac": 594.52,
-      "roas": 1.75
-    },
-    {
       "day": "05-02",
       "spend": 108509.38,
       "impressions": 1093935,
@@ -2545,8 +2535,8 @@
       "impressions": 9103561,
       "spend": 611410.07,
       "purchases": 0,
-      "revenue": 79266.0,
-      "shopify_orders": 74,
+      "revenue": 77699.25,
+      "shopify_orders": 70,
       "revenue_source": "shopify",
       "cac": 0,
       "roas": 0.13,
@@ -2559,8 +2549,8 @@
       "impressions": 2526033,
       "spend": 200877.43,
       "purchases": 0,
-      "revenue": 24008.55,
-      "shopify_orders": 19,
+      "revenue": 24648.55,
+      "shopify_orders": 20,
       "revenue_source": "shopify",
       "cac": 0,
       "roas": 0.12,
@@ -2573,11 +2563,11 @@
       "impressions": 903621,
       "spend": 166704.44,
       "purchases": 0,
-      "revenue": 23218.29,
-      "shopify_orders": 24,
+      "revenue": 20568.29,
+      "shopify_orders": 20,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.14,
+      "roas": 0.12,
       "ctr": 1.13
     },
     {
@@ -2587,11 +2577,11 @@
       "impressions": 515392,
       "spend": 146859.39,
       "purchases": 0,
-      "revenue": 27339.3,
-      "shopify_orders": 25,
+      "revenue": 26409.3,
+      "shopify_orders": 24,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.19,
+      "roas": 0.18,
       "ctr": 1.52
     },
     {
@@ -2601,11 +2591,11 @@
       "impressions": 493367,
       "spend": 94982.57,
       "purchases": 0,
-      "revenue": 11875.55,
-      "shopify_orders": 12,
+      "revenue": 13855.55,
+      "shopify_orders": 13,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.13,
+      "roas": 0.15,
       "ctr": 1.1
     },
     {
@@ -2615,11 +2605,11 @@
       "impressions": 701475,
       "spend": 84632.01,
       "purchases": 0,
-      "revenue": 11313.9,
-      "shopify_orders": 12,
+      "revenue": 13221.8,
+      "shopify_orders": 14,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.13,
+      "roas": 0.16,
       "ctr": 0.84
     },
     {
@@ -2629,11 +2619,11 @@
       "impressions": 1326027,
       "spend": 83072.36,
       "purchases": 0,
-      "revenue": 9376.25,
-      "shopify_orders": 8,
+      "revenue": 6821.05,
+      "shopify_orders": 6,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.11,
+      "roas": 0.08,
       "ctr": 0.62
     },
     {
@@ -2643,11 +2633,11 @@
       "impressions": 499400,
       "spend": 81342.73,
       "purchases": 0,
-      "revenue": 14522.0,
-      "shopify_orders": 11,
+      "revenue": 16459.9,
+      "shopify_orders": 13,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.18,
+      "roas": 0.2,
       "ctr": 0.9
     },
     {
@@ -2671,11 +2661,11 @@
       "impressions": 871144,
       "spend": 59357.05,
       "purchases": 0,
-      "revenue": 9432.1,
+      "revenue": 9877.3,
       "shopify_orders": 9,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.16,
+      "roas": 0.17,
       "ctr": 0.6
     },
     {
@@ -2699,11 +2689,11 @@
       "impressions": 227731,
       "spend": 29127.01,
       "purchases": 0,
-      "revenue": 2279.0,
-      "shopify_orders": 3,
+      "revenue": 2909.0,
+      "shopify_orders": 4,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.08,
+      "roas": 0.1,
       "ctr": 0.99
     },
     {
@@ -2713,11 +2703,11 @@
       "impressions": 331892,
       "spend": 26522.77,
       "purchases": 0,
-      "revenue": 4245.2,
-      "shopify_orders": 4,
+      "revenue": 3315.2,
+      "shopify_orders": 3,
       "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.16,
+      "roas": 0.12,
       "ctr": 0.59
     },
     {
@@ -2825,11 +2815,11 @@
       "impressions": 37,
       "spend": 6.55,
       "purchases": 0,
-      "revenue": 0.0,
-      "shopify_orders": 0,
-      "revenue_source": "meta_pixel",
+      "revenue": 630.0,
+      "shopify_orders": 1,
+      "revenue_source": "shopify",
       "cac": 0,
-      "roas": 0.0,
+      "roas": 96.18,
       "ctr": 0.0
     },
     {
@@ -3294,14 +3284,6 @@
       "cac": 0
     },
     {
-      "hour": "05",
-      "spend": 0.0,
-      "impressions": 0,
-      "clicks": 0,
-      "purchases": 0,
-      "cac": 0
-    },
-    {
       "hour": "07",
       "spend": 0.0,
       "impressions": 0,
@@ -3338,7 +3320,7 @@
       "spend": 0.0,
       "impressions": 0,
       "clicks": 0,
-      "purchases": 2,
+      "purchases": 1,
       "cac": 0.0
     },
     {
@@ -3362,7 +3344,7 @@
       "spend": 0.0,
       "impressions": 0,
       "clicks": 0,
-      "purchases": 3,
+      "purchases": 2,
       "cac": 0.0
     },
     {
@@ -3439,16 +3421,16 @@
     }
   ],
   "pacing": {
-    "days_elapsed": 29,
-    "days_remaining": 1,
+    "days_elapsed": 30,
+    "days_remaining": 0,
     "spend_to_date": 1903911.48,
-    "daily_avg": 65652.12,
-    "projected_month": 1969563.6,
+    "daily_avg": 63463.72,
+    "projected_month": 1903911.6,
     "purchases_to_date": 2825,
-    "projected_purchases": 2922,
+    "projected_purchases": 2825,
     "projected_cac": 673.95
   },
-  "lastUpdated": "2026-05-29 10:35 IST",
+  "lastUpdated": "2026-05-30 10:14 IST",
   "dateRange": "this_month",
   "shopify_connected": true
 }
