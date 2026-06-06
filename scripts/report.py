@@ -41,7 +41,7 @@ TRELLO_BOARD_ID = os.environ["TRELLO_BOARD_ID"]
 SHEETS_ID = os.environ["GOOGLE_SHEETS_ID"]
 SERVICE_ACCOUNT_JSON = os.environ["GOOGLE_SERVICE_ACCOUNT"]
 
-claude = anthropic.Anthropic(api_key=CLAUDE_KEY)
+claude = anthropic.Anthropic(api_key=CLAUDE_KEY, max_retries=2)
 
 
 # ─── GOOGLE SHEETS CONFIG ─────────────────────────────────────────────────────
@@ -210,7 +210,7 @@ def analyse_account(account, insights, account_summary, thresholds, prompts):
 
     try:
         response = claude.messages.create(
-            model="claude-sonnet-4-20250514",
+            model="claude-3-5-sonnet-20241022",
             max_tokens=1000,
             messages=[{"role": "user", "content": prompt}]
         )
