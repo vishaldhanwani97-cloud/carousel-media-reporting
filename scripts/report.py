@@ -501,12 +501,12 @@ def build_html_email(all_results, team, thresholds):
     INNER_W = 560
     CLIENT_CARD_W = 250
     CLIENT_GAP_W = 12
-    CLIENT_INNER_W = 212
-    METRIC_W = 100
+    CLIENT_INNER_W = 222
+    METRIC_W = 105
     METRIC_GAP_W = 12
     TEAM_CARD_W = 250
     TEAM_GAP_W = 12
-    TEAM_INNER_W = 212
+    TEAM_INNER_W = 222
 
     def s(v):
         return escape(str(v)) if v is not None else ""
@@ -634,13 +634,13 @@ def build_html_email(all_results, team, thresholds):
             '<table role="presentation" width="' + str(CLIENT_CARD_W) + '" cellpadding="0" cellspacing="0" border="0" '
             'style="width:' + str(CLIENT_CARD_W) + 'px;border-collapse:separate;background:#FFFFFF;border:1px solid ' + BORDER + ';border-radius:8px;">'
             '<tr><td style="background:' + ORANGE + ';border-radius:8px 8px 0 0;padding:14px;">'
-            '<table role="presentation" width="276" cellpadding="0" cellspacing="0" border="0" style="width:276px;border-collapse:collapse;">'
+            '<table role="presentation" width="222" cellpadding="0" cellspacing="0" border="0" style="width:222px;border-collapse:collapse;">'
             '<tr>'
-            '<td width="195" style="width:195px;">'
+            '<td width="150" style="width:150px;">'
             '<div style="font-size:14px;color:#FFF;font-weight:900;font-family:Arial,Helvetica,sans-serif;">' + s(acct.get("account_name")) + '</div>'
             '<div style="font-size:10px;color:#FFE0CF;font-weight:700;font-family:Arial,Helvetica,sans-serif;">' + s(acct.get("owner_name")) + ' &middot; Meta</div>'
             '</td>'
-            '<td width="81" align="right" style="width:81px;">'
+            '<td width="72" align="right" style="width:72px;">'
             '<span style="display:inline-block;background:' + sbg + ';color:' + sc + ';font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:900;padding:4px 9px;border-radius:14px;">' + s(sl) + '</span>'
             '</td>'
             '</tr></table></td></tr>'
@@ -863,7 +863,7 @@ def build_html_email(all_results, team, thresholds):
     clients_html = account_rows(accounts)
     team_html_str = team_rows(team_list)
 
-    IW = str(INNER_W - 48)
+    IW = '512'
 
     return (
         '<!doctype html><html><head>'
@@ -922,7 +922,7 @@ def build_html_email(all_results, team, thresholds):
         'style="width:' + str(INNER_W) + 'px;border-collapse:collapse;background:' + NAVY + ';border-radius:0 0 10px 10px;">'
         '<tr>'
         '<td width="310" style="width:310px;padding:15px 28px;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:' + TEAL + ';">carouselmedia.in &middot; Tasks synced to Trello</td>'
-        '<td width="310" align="right" style="width:310px;padding:15px 28px;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#A9C7D3;">Powered by Claude AI</td>'
+        '<td width="280" align="right" style="width:280px;padding:15px 28px;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#A9C7D3;">Powered by Claude AI</td>'
         '</tr></table>'
 
         '</td></tr>'
