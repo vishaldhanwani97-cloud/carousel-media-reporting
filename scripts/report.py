@@ -322,6 +322,59 @@ def create_tasks_in_trello(all_results, team):
                 create_trello_card(todo_list_id, title, desc)
 
 
+def calculate_pacing(account_name, summary, thresholds):
+    """Calculate monthly budget and revenue pacing."""
+    thresh = thresholds.get(account_name, {})
+    monthly_budget = float(thresh.get("Monthly Budget Goal", 0))
+    monthly_revenue = float(thresh.get("Monthly Revenue Goal", 0))
+    
+    if monthly_budget == 0 and monthly_revenue == 0:
+        return None
+    
+    # Days elapsed in current month
+    from calendar import monthrange
+    days_in_month = monthrange(TODAY.year, TODAY.month)[1]
+    days_elapsed = TODAY.day
+    pct_month_elapsed = days_elapsed / days_in_month
+    
+    # MTD spend and revenue (using last_30d as proxy, scaled to days)
+    mtd_spend = summary.get("last_30d", {}).get("spend", 0)
+    mtd_revenue = summary.get("last_30d", {}).get("revenue", 0)
+    
+    # Pacing calculations
+    budget_pacing = (mtd_spend / monthly_budget * 100) if monthly_budget > 0 else 0
+    revenue_pacing = (mtd_revenue / monthly_revenue * 100) if monthly_revenue > 0 else 0
+    expected_pct = pct_month_elapsed * 100
+    
+    # Status
+    def pacing_status(actual_pct, expected_pct):
+        if actual_pct >= expected_pct * 1.15:
+            return "overpacing", "#c0392b"
+        elif actual_pct >= expected_pct * 0.85:
+            return "on_pace", "#1a7a4a"
+        else:
+            return "underpacing", "#d68910"
+    
+    budget_status, budget_color = pacing_status(budget_pacing, expected_pct)
+    revenue_status, revenue_color = pacing_status(revenue_pacing, expected_pct)
+    
+    return {
+        "monthly_budget": monthly_budget,
+        "monthly_revenue": monthly_revenue,
+        "mtd_spend": mtd_spend,
+        "mtd_revenue": mtd_revenue,
+        "budget_pacing_pct": round(budget_pacing, 1),
+        "revenue_pacing_pct": round(revenue_pacing, 1),
+        "expected_pct": round(expected_pct, 1),
+        "days_elapsed": days_elapsed,
+        "days_in_month": days_in_month,
+        "budget_status": budget_status,
+        "budget_color": budget_color,
+        "revenue_status": revenue_status,
+        "revenue_color": revenue_color,
+    }
+
+
 def roas_color(roas, goal):
     if roas >= goal:
         return "#1a7a4a"
@@ -382,6 +435,7 @@ def build_html_email(all_results, team, thresholds):
             status = "alert"
             needs_attention += 1
 
+        pacing = result.get("pacing")
         account_rows.append({
             "name": account["Account Name"],
             "owner_name": owner_name,
@@ -393,7 +447,8 @@ def build_html_email(all_results, team, thresholds):
             "cpc_7d": f"{l7.get('cpc',0):,.0f}",
             "ctr_7d": l7.get("ctr", 0),
             "purchases_7d": l7.get("purchases", 0),
-            "status": status
+            "status": status,
+            "pacing": pacing
         })
 
         if result.get("alerts"):
@@ -437,6 +492,19 @@ def build_html_email(all_results, team, thresholds):
     acct_rows_html = ""
     for row in account_rows:
         rc = roas_color(row["roas_7d"], row["roas_goal"])
+        p = row.get("pacing")
+        if p:
+            pacing_row = f"""<tr style="background:#fafafa">
+          <td colspan="10" style="padding:6px 12px;border-bottom:1px solid #f0f0f0;font-size:11px">
+            <span style="color:#888;margin-right:12px">📅 Day {p['days_elapsed']} of {p['days_in_month']} ({p['expected_pct']}% of month)</span>
+            <span style="margin-right:16px">Budget: <b style="color:{p['budget_color']}">₹{p['mtd_spend']:,.0f} / ₹{p['monthly_budget']:,.0f} ({p['budget_pacing_pct']}%)</b>
+            <span style="color:{p['budget_color']};font-size:10px;margin-left:4px">{'▲ Overpacing' if p['budget_status']=='overpacing' else '✓ On Pace' if p['budget_status']=='on_pace' else '▼ Underpacing'}</span></span>
+            <span>Revenue: <b style="color:{p['revenue_color']}">₹{p['mtd_revenue']:,.0f} / ₹{p['monthly_revenue']:,.0f} ({p['revenue_pacing_pct']}%)</b>
+            <span style="color:{p['revenue_color']};font-size:10px;margin-left:4px">{'▲ Overpacing' if p['revenue_status']=='overpacing' else '✓ On Pace' if p['revenue_status']=='on_pace' else '▼ Underpacing'}</span></span>
+          </td>
+        </tr>"""
+        else:
+            pacing_row = ""
         acct_rows_html += f"""
         <tr>
           <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;font-weight:600;font-size:12px">{row['name']}</td>
@@ -449,7 +517,8 @@ def build_html_email(all_results, team, thresholds):
           <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;font-size:12px">{row['ctr_7d']}%</td>
           <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;font-size:12px">{row['purchases_7d']}</td>
           <td style="padding:10px 12px;border-bottom:1px solid #f0f0f0">{status_badge(row['status'])}</td>
-        </tr>"""
+        </tr>
+        {pacing_row}"""
 
     # Build alerts HTML
     alerts_html = ""
@@ -862,13 +931,15 @@ def main():
                 digest=account_digest,
                 open_actions=open_actions
             )
+            pacing = calculate_pacing(account_name, summary, thresholds)
             all_results.append({
                 "account_name": account_name,
                 "account": account,
                 "raw_insights": insights,
                 "summary": summary,
                 "alerts": alerts,
-                "claude_insights": claude_insights
+                "claude_insights": claude_insights,
+                "pacing": pacing
             })
         except Exception as e:
             print(f"   ⚠️ Error processing {account_name}: {e}")
