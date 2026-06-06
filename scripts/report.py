@@ -907,13 +907,13 @@ def build_html_email(all_results, team, thresholds):
 
         '<table role="presentation" width="' + str(INNER_W) + '" cellpadding="0" cellspacing="0" border="0" '
         'style="width:' + str(INNER_W) + 'px;border-collapse:collapse;background:#FFFFFF;">'
-        '<tr><td style="padding:22px 28px 12px 28px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999;font-weight:900;text-transform:uppercase;letter-spacing:1.6px;">Client Snapshots</td></tr>'
-        '<tr><td style="padding:0 28px 4px 28px;">'
+        '<tr><td style="padding:22px 24px 12px 24px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999;font-weight:900;text-transform:uppercase;letter-spacing:1.6px;">Client Snapshots</td></tr>'
+        '<tr><td style="padding:0 24px 4px 24px;">'
         '<table role="presentation" width="' + IW + '" cellpadding="0" cellspacing="0" border="0" style="width:' + IW + 'px;border-collapse:collapse;">'
         + clients_html +
         '</table></td></tr>'
-        '<tr><td style="padding:18px 28px 12px 28px;border-top:1px solid #EEE;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999;font-weight:900;text-transform:uppercase;letter-spacing:1.6px;">Today\'s War Room</td></tr>'
-        '<tr><td style="padding:0 28px 8px 28px;">'
+        '<tr><td style="padding:18px 24px 12px 24px;border-top:1px solid #EEE;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999;font-weight:900;text-transform:uppercase;letter-spacing:1.6px;">Today\'s War Room</td></tr>'
+        '<tr><td style="padding:0 24px 8px 24px;">'
         '<table role="presentation" width="' + IW + '" cellpadding="0" cellspacing="0" border="0" style="width:' + IW + 'px;border-collapse:collapse;">'
         + team_html_str +
         '</table></td></tr></table>'
@@ -922,7 +922,7 @@ def build_html_email(all_results, team, thresholds):
         'style="width:' + str(INNER_W) + 'px;border-collapse:collapse;background:' + NAVY + ';border-radius:0 0 10px 10px;">'
         '<tr>'
         '<td width="310" style="width:310px;padding:15px 28px;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:' + TEAL + ';">carouselmedia.in &middot; Tasks synced to Trello</td>'
-        '<td width="280" align="right" style="width:280px;padding:15px 28px;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#A9C7D3;">Powered by Claude AI</td>'
+        '<td width="224" align="right" style="width:224px;padding:15px 28px;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#A9C7D3;">Powered by Claude AI</td>'
         '</tr></table>'
 
         '</td></tr>'
