@@ -98,7 +98,7 @@ def meta_get(endpoint, params={}):
 def get_account_insights(account_id, date_preset):
     """Pull campaign-level insights for a given date preset."""
     fields = (
-        "campaign_name,campaign_id,status,objective,"
+        "campaign_name,campaign_id,"
         "spend,impressions,clicks,ctr,cpc,cpm,reach,"
         "actions,action_values,cost_per_action_type,"
         "frequency"
