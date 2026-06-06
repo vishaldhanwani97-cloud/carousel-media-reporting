@@ -47,11 +47,15 @@ claude = anthropic.Anthropic(api_key=CLAUDE_KEY)
 # ─── GOOGLE SHEETS CONFIG ─────────────────────────────────────────────────────
 
 def get_sheets_client():
-    sa_info = json.loads(SERVICE_ACCOUNT_JSON)
-    creds = service_account.Credentials.from_service_account_info(
-        sa_info,
+    creds = Credentials(
+        token=None,
+        refresh_token=GMAIL_REFRESH_TOKEN,
+        client_id=GMAIL_CLIENT_ID,
+        client_secret=GMAIL_CLIENT_SECRET,
+        token_uri="https://oauth2.googleapis.com/token",
         scopes=["https://www.googleapis.com/auth/spreadsheets.readonly"]
     )
+    creds.refresh(Request())
     return gspread.authorize(creds)
 
 
