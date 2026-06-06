@@ -865,6 +865,7 @@ def main():
             all_results.append({
                 "account_name": account_name,
                 "account": account,
+                "raw_insights": insights,
                 "summary": summary,
                 "alerts": alerts,
                 "claude_insights": claude_insights
@@ -886,7 +887,7 @@ def main():
         if not dna.get(account_name) and result["summary"].get("last_30d", {}).get("spend", 0) > 0:
             print(f"   Generating DNA for {account_name}...")
             generated_dna = generate_account_dna(
-                account_name, result["insights"], 
+                account_name, result.get("raw_insights", {}), 
                 result["summary"], thresholds
             )
             save_dna_to_sheets(
@@ -902,7 +903,7 @@ def main():
             if result["summary"].get("last_7d", {}).get("spend", 0) > 0:
                 print(f"   Generating digest for {account_name}...")
                 generated_digest = generate_weekly_digest(
-                    account_name, result["insights"],
+                    account_name, result.get("raw_insights", {}),
                     result["summary"], result["alerts"], []
                 )
                 save_digest_to_sheets(
