@@ -63,7 +63,28 @@ def load_config():
                for r in sh.worksheet("Prompts").get_all_records()
                if str(r.get("Active", "")).upper() == "Y"}
     team = sh.worksheet("Team").get_all_records()
-    return accounts, thresholds, prompts, team
+    
+    # Load DNA, Weekly Digest, Action Log
+    try:
+        dna_records = sh.worksheet("Account DNA").get_all_records()
+        dna = {r["Account Name"]: r.get("DNA", "") for r in dna_records if r.get("Account Name")}
+    except:
+        dna = {}
+    
+    try:
+        digest_records = sh.worksheet("Weekly Digest").get_all_records()
+        digests = {r["Account Name"]: r.get("Digest", "") for r in digest_records if r.get("Account Name")}
+    except:
+        digests = {}
+    
+    try:
+        action_records = sh.worksheet("Action Log").get_all_records()
+        open_actions = [r for r in action_records 
+                       if str(r.get("Status", "")).lower() == "open"]
+    except:
+        open_actions = []
+    
+    return accounts, thresholds, prompts, team, dna, digests, open_actions
 
 
 def meta_get(endpoint, params={}):
@@ -137,11 +158,18 @@ def compute_account_summary(insights_by_window):
     return summary
 
 
-def analyse_account(account, insights, summary, thresholds, prompts):
+def analyse_account(account, insights, summary, thresholds, prompts,
+                    dna="", digest="", open_actions=None):
     thresh = thresholds.get(account["Account Name"], {})
-    prompt = prompts.get("overview_insights", "")
+    base_prompt = prompts.get("overview_insights", "")
+    account_name = account["Account Name"]
+    
+    # Filter open actions for this account
+    account_actions = [a for a in (open_actions or []) 
+                      if a.get("Account Name") == account_name]
+    
     payload = {
-        "account_name": account["Account Name"],
+        "account_name": account_name,
         "goals": {
             "roas_goal": float(thresh.get("ROAS Goal", 2.0)),
             "cac_goal": float(thresh.get("CAC Goal", 500)),
@@ -155,6 +183,37 @@ def analyse_account(account, insights, summary, thresholds, prompts):
         },
         "campaigns": {"last_7d": insights.get("last_7d", [])[:5]}
     }
+    
+    # Build enriched prompt with memory layers
+    context_block = ""
+    
+    if dna:
+        context_block += f"""
+ACCOUNT DNA (permanent knowledge — always apply this):
+{dna}
+
+"""
+    
+    if digest:
+        context_block += f"""
+LAST WEEK DIGEST (what happened recently):
+{digest}
+
+"""
+    
+    if account_actions:
+        actions_text = "\n".join([
+            f"- {a.get('Action Taken','')} (logged {a.get('Date','')}, "
+            f"expected resolution {a.get('Expected Resolution Date','')})"
+            for a in account_actions
+        ])
+        context_block += f"""
+OPEN ACTIONS IN FLIGHT (do not re-flag these as new issues):
+{actions_text}
+
+"""
+    
+    prompt = context_block + base_prompt
     prompt = prompt.replace("{{OVERVIEW_DATA}}", json.dumps(payload))
     prompt = prompt.replace("{{SEASONALITY_CONTEXT}}", "No major seasonal event active.")
     try:
@@ -605,10 +664,184 @@ def send_email(html_content, exec_summary, team):
     print(f"✅ Email sent to {', '.join(recipients)}")
 
 
+def generate_account_dna(account_name, insights, summary, thresholds):
+    """Generate first-draft DNA for an account based on 30D data."""
+    thresh = thresholds.get(account_name, {})
+    l30 = summary.get("last_30d", {})
+    l7 = summary.get("last_7d", {})
+    
+    campaigns_30d = insights.get("last_30d", [])
+    top_campaigns = sorted(campaigns_30d, 
+                          key=lambda x: float(x.get("spend", 0)), 
+                          reverse=True)[:5]
+    
+    campaign_summary = []
+    for c in top_campaigns:
+        spend = float(c.get("spend", 0))
+        if spend > 0:
+            revenue = extract_revenue(c.get("action_values", []))
+            roas = round(revenue / spend, 2) if spend > 0 else 0
+            campaign_summary.append(f"{c.get('campaign_name', 'Unknown')}: ₹{spend:,.0f} spend, {roas}x ROAS")
+    
+    prompt = f"""You are analysing a Meta ads account for a performance marketing agency in India.
+Based on the 30-day performance data below, write a concise Account DNA — permanent institutional knowledge about this account.
+
+Account: {account_name}
+ROAS Goal: {thresh.get("ROAS Goal", 2.0)}x
+CAC Goal: ₹{thresh.get("CAC Goal", 500)}
+
+30D Summary:
+- Spend: ₹{l30.get("spend", 0):,.0f}
+- ROAS: {l30.get("roas", 0)}x
+- CPM: ₹{l30.get("cpm", 0):,.0f}
+- CPC: ₹{l30.get("cpc", 0):,.0f}
+- CTR: {l30.get("ctr", 0)}%
+- Purchases: {l30.get("purchases", 0)}
+
+7D Summary:
+- Spend: ₹{l7.get("spend", 0):,.0f}
+- ROAS: {l7.get("roas", 0)}x
+- CPM: ₹{l7.get("cpm", 0):,.0f}
+
+Top Campaigns by Spend (30D):
+{chr(10).join(campaign_summary)}
+
+Write the Account DNA as 5-8 bullet points covering:
+- What product/campaign types perform best on ROAS
+- Typical CPM and CPC benchmarks for this account
+- Known patterns (audience fatigue speed, best performing windows, etc.)
+- Any structural notes about campaign setup
+- Current performance trajectory (improving/declining/stable)
+
+Keep it under 200 words. Write in plain text with bullet points starting with -
+This will be read by an AI every morning as permanent context, so be specific and factual."""
+
+    try:
+        response = claude.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=500,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.content[0].text.strip()
+    except Exception as e:
+        return f"DNA generation failed: {e}"
+
+
+def generate_weekly_digest(account_name, insights, summary, alerts, claude_insights_history):
+    """Generate weekly digest — runs every Sunday."""
+    l7 = summary.get("last_7d", {})
+    l30 = summary.get("last_30d", {})
+    
+    prompt = f"""You are summarising the last 7 days of Meta ads performance for {account_name}.
+
+7D Performance:
+- Spend: ₹{l7.get("spend", 0):,.0f}
+- ROAS: {l7.get("roas", 0)}x
+- CPM: ₹{l7.get("cpm", 0):,.0f} (30D avg: ₹{l30.get("cpm", 0):,.0f})
+- CPC: ₹{l7.get("cpc", 0):,.0f} (30D avg: ₹{l30.get("cpc", 0):,.0f})
+- CTR: {l7.get("ctr", 0)}% (30D avg: {l30.get("ctr", 0)}%)
+- Purchases: {l7.get("purchases", 0)}
+
+Alerts flagged this week: {len(alerts)}
+{chr(10).join([a.get("message", "") for a in alerts])}
+
+Write a 100-150 word weekly digest covering:
+- What happened this week (performance up/down/stable + why)
+- Key signals observed (fatigue, scaling opportunity, creative issues)
+- What was actioned (if anything visible in the data)
+- What to watch next week
+
+Plain text, past tense, factual. No bullet points — write as a paragraph.
+This replaces last week's digest and will be read as context next week."""
+
+    try:
+        response = claude.messages.create(
+            model="claude-3-5-sonnet-20241022",
+            max_tokens=300,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.content[0].text.strip()
+    except Exception as e:
+        return f"Digest generation failed: {e}"
+
+
+def save_dna_to_sheets(account_name, dna_text, sheets_id, refresh_token, client_id, client_secret):
+    """Save generated DNA back to Google Sheet."""
+    try:
+        creds = Credentials(
+            token=None,
+            refresh_token=refresh_token,
+            client_id=client_id,
+            client_secret=client_secret,
+            token_uri="https://oauth2.googleapis.com/token",
+            scopes=[
+                "https://www.googleapis.com/auth/gmail.send",
+                "https://www.googleapis.com/auth/spreadsheets"
+            ]
+        )
+        creds.refresh(Request())
+        gc = gspread.authorize(creds)
+        sh = gc.open_by_key(sheets_id)
+        ws = sh.worksheet("Account DNA")
+        
+        # Find existing row or add new one
+        records = ws.get_all_records()
+        for i, r in enumerate(records):
+            if r.get("Account Name") == account_name:
+                row_num = i + 2  # +2 for header and 0-index
+                ws.update(f"B{row_num}", [[dna_text]])
+                ws.update(f"C{row_num}", [[TODAY.strftime("%Y-%m-%d")]])
+                print(f"   Updated DNA for {account_name}")
+                return
+        
+        # Add new row if not found
+        ws.append_row([account_name, dna_text, TODAY.strftime("%Y-%m-%d")])
+        print(f"   Added DNA for {account_name}")
+    except Exception as e:
+        print(f"   Could not save DNA: {e}")
+
+
+def save_digest_to_sheets(account_name, digest_text, sheets_id, refresh_token, client_id, client_secret):
+    """Save weekly digest back to Google Sheet."""
+    try:
+        creds = Credentials(
+            token=None,
+            refresh_token=refresh_token,
+            client_id=client_id,
+            client_secret=client_secret,
+            token_uri="https://oauth2.googleapis.com/token",
+            scopes=[
+                "https://www.googleapis.com/auth/gmail.send",
+                "https://www.googleapis.com/auth/spreadsheets"
+            ]
+        )
+        creds.refresh(Request())
+        gc = gspread.authorize(creds)
+        sh = gc.open_by_key(sheets_id)
+        ws = sh.worksheet("Weekly Digest")
+        
+        records = ws.get_all_records()
+        week_of = TODAY.strftime("%Y-%m-%d")
+        
+        for i, r in enumerate(records):
+            if r.get("Account Name") == account_name:
+                row_num = i + 2
+                ws.update(f"B{row_num}", [[digest_text]])
+                ws.update(f"C{row_num}", [[week_of]])
+                ws.update(f"D{row_num}", [["Auto-generated"]])
+                print(f"   Updated digest for {account_name}")
+                return
+        
+        ws.append_row([account_name, digest_text, week_of, "Auto-generated"])
+        print(f"   Added digest for {account_name}")
+    except Exception as e:
+        print(f"   Could not save digest: {e}")
+
+
 def main():
     print(f"🚀 Starting Carousel Media Daily Report — {TODAY}")
     print("📊 Loading config from Google Sheets...")
-    accounts, thresholds, prompts, team = load_config()
+    accounts, thresholds, prompts, team, dna, digests, open_actions = load_config()
     print(f"   Loaded {len(accounts)} active accounts, {len(team)} team members")
 
     all_results = []
@@ -621,7 +854,14 @@ def main():
             summary = compute_account_summary(insights)
             alerts = detect_anomalies(account_name, summary, thresholds)
             print(f"   Analysing {account_name} with Claude...")
-            claude_insights = analyse_account(account, insights, summary, thresholds, prompts)
+            account_dna = dna.get(account_name, "")
+            account_digest = digests.get(account_name, "")
+            claude_insights = analyse_account(
+                account, insights, summary, thresholds, prompts,
+                dna=account_dna,
+                digest=account_digest,
+                open_actions=open_actions
+            )
             all_results.append({
                 "account_name": account_name,
                 "account": account,
@@ -638,6 +878,37 @@ def main():
                 "alerts": [],
                 "claude_insights": {"insights": []}
             })
+
+    # Auto-generate DNA for accounts that don't have it yet
+    print("🧬 Checking Account DNA...")
+    for result in all_results:
+        account_name = result["account_name"]
+        if not dna.get(account_name) and result["summary"].get("last_30d", {}).get("spend", 0) > 0:
+            print(f"   Generating DNA for {account_name}...")
+            generated_dna = generate_account_dna(
+                account_name, result["insights"], 
+                result["summary"], thresholds
+            )
+            save_dna_to_sheets(
+                account_name, generated_dna, SHEETS_ID,
+                GMAIL_REFRESH_TOKEN, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET
+            )
+
+    # Generate weekly digest every Sunday
+    if TODAY.weekday() == 6:  # 6 = Sunday
+        print("📅 Sunday — generating weekly digests...")
+        for result in all_results:
+            account_name = result["account_name"]
+            if result["summary"].get("last_7d", {}).get("spend", 0) > 0:
+                print(f"   Generating digest for {account_name}...")
+                generated_digest = generate_weekly_digest(
+                    account_name, result["insights"],
+                    result["summary"], result["alerts"], []
+                )
+                save_digest_to_sheets(
+                    account_name, generated_digest, SHEETS_ID,
+                    GMAIL_REFRESH_TOKEN, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET
+                )
 
     print("📋 Creating Trello cards...")
     try:
