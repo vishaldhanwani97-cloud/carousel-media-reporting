@@ -578,22 +578,24 @@ def build_html_email(all_results, team, thresholds):
                 "tasks": []
             }
         
-        for ins in insights:
-            if ins.get("type") in ["fix", "scale"]:
-                tasks_by_owner[owner_email]["tasks"].append({
-                    "account": account_name,
-                    "action": ins.get("text", "")[:100],
-                    "deadline": "Today EOD",
-                    "color": "#c0392b" if ins.get("type") == "fix" else "#1a7a4a"
-                })
-        
-        for alert in alerts_list:
+        # Add max 1 task per account — top priority only
+        if alerts_list:
+            top = alerts_list[0]
             tasks_by_owner[owner_email]["tasks"].append({
                 "account": account_name,
-                "action": alert["message"],
-                "deadline": "Now" if alert["severity"] == "high" else "Today EOD",
-                "color": "#c0392b" if alert["severity"] == "high" else "#d68910"
+                "action": top["message"],
+                "deadline": "Now" if top["severity"] == "high" else "Today EOD",
+                "color": "#c0392b" if top["severity"] == "high" else "#d68910"
             })
+        elif insights:
+            top_ins = next((i for i in insights if i.get("type") in ["fix", "scale"]), None)
+            if top_ins:
+                tasks_by_owner[owner_email]["tasks"].append({
+                    "account": account_name,
+                    "action": top_ins.get("text", "")[:120],
+                    "deadline": "Today EOD",
+                    "color": "#c0392b" if top_ins.get("type") == "fix" else "#1a7a4a"
+                })
         
         # Card HTML
         account_cards_html += f"""
@@ -674,56 +676,100 @@ def build_html_email(all_results, team, thresholds):
     
     html = f"""<!DOCTYPE html>
 <html>
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body style="margin:0;padding:0;background:#f0f0f0;font-family:'Montserrat',Arial,sans-serif">
-<div style="max-width:680px;margin:0 auto;padding:20px">
 
-  <div style="background:#08415C;border-radius:12px 12px 0 0;padding:20px 28px;display:flex;justify-content:space-between;align-items:center">
-    <div style="display:flex;align-items:center;gap:10px">
-      <div style="background:#F27C38;border-radius:8px;width:36px;height:36px;display:flex;align-items:center;justify-content:center">
-        <svg viewBox="0 0 20 20" fill="none" width="20" height="20"><rect x="2" y="2" width="5" height="5" rx="1.5" fill="white"/><rect x="9" y="2" width="5" height="5" rx="2" fill="white"/><rect x="16" y="3" width="2" height="3" rx="1" fill="white"/><rect x="2" y="11" width="16" height="3" rx="1.5" fill="white"/></svg>
-      </div>
-      <div>
-        <div style="color:#fff;font-size:16px;font-weight:700;letter-spacing:.5px">CAROUSEL MEDIA</div>
-        <div style="color:#2AB6C9;font-size:10px;font-weight:500;margin-top:1px;letter-spacing:.04em;text-transform:uppercase">Daily Performance Report</div>
-      </div>
-    </div>
-    <div style="text-align:right">
-      <div style="color:#fff;font-size:12px;font-weight:500">{date_str}</div>
-      <div style="color:#2AB6C9;font-size:10px;margin-top:3px">Generated 8:00 AM IST</div>
-    </div>
-  </div>
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f0f0f0">
+<tr><td align="center" style="padding:20px">
+<table width="640" cellpadding="0" cellspacing="0" border="0" style="max-width:640px">
 
-  <div style="background:#F27C38;padding:14px 28px">
-    <div style="color:#fff;font-size:12px;font-weight:600;text-align:center">{greeting}</div>
-    <div style="color:rgba(255,255,255,0.85);font-size:10px;text-align:center;margin-top:4px">{subtitle}</div>
-  </div>
+  <!-- HEADER -->
+  <tr>
+    <td style="background:#08415C;border-radius:12px 12px 0 0;padding:20px 28px">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td>
+            <table cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td style="background:#F27C38;border-radius:8px;width:36px;height:36px;text-align:center;vertical-align:middle">
+                  <span style="color:#fff;font-size:18px;font-weight:900">C</span>
+                </td>
+                <td style="padding-left:10px">
+                  <div style="color:#fff;font-size:15px;font-weight:700;letter-spacing:.5px">CAROUSEL MEDIA</div>
+                  <div style="color:#2AB6C9;font-size:9px;font-weight:600;margin-top:2px;letter-spacing:.06em;text-transform:uppercase">Daily Performance Report</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+          <td align="right">
+            <div style="color:#fff;font-size:11px;font-weight:600">{date_str}</div>
+            <div style="color:#2AB6C9;font-size:10px;margin-top:3px">Generated 8:00 AM IST</div>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
 
-  <div style="background:#fff;padding:20px 28px;border-left:1px solid #e8e8e8;border-right:1px solid #e8e8e8">
-    <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#999;margin-bottom:14px">Client Snapshots</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+  <!-- QUIRKY BAR -->
+  <tr>
+    <td style="background:#F27C38;padding:14px 28px;text-align:center">
+      <div style="color:#fff;font-size:13px;font-weight:700">{greeting}</div>
+      <div style="color:rgba(255,255,255,0.85);font-size:10px;margin-top:5px">{subtitle}</div>
+    </td>
+  </tr>
+
+  <!-- CLIENT SNAPSHOTS LABEL -->
+  <tr>
+    <td style="background:#fff;padding:20px 28px 12px;border-left:1px solid #e8e8e8;border-right:1px solid #e8e8e8">
+      <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#999">Client Snapshots</div>
+    </td>
+  </tr>
+
+  <!-- CLIENT CARDS -->
+  <tr>
+    <td style="background:#fff;padding:0 28px 20px;border-left:1px solid #e8e8e8;border-right:1px solid #e8e8e8">
       {account_cards_html}
-    </div>
-  </div>
+    </td>
+  </tr>
 
-  <div style="background:#fff;padding:20px 28px;border-left:1px solid #e8e8e8;border-right:1px solid #e8e8e8;border-top:1px solid #f0f0f0">
-    <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#999;margin-bottom:14px">Today's War Room</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+  <!-- WAR ROOM LABEL -->
+  <tr>
+    <td style="background:#fff;padding:20px 28px 12px;border-left:1px solid #e8e8e8;border-right:1px solid #e8e8e8;border-top:1px solid #f0f0f0">
+      <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#999">Today's War Room</div>
+    </td>
+  </tr>
+
+  <!-- TEAM CARDS -->
+  <tr>
+    <td style="background:#fff;padding:0 28px 20px;border-left:1px solid #e8e8e8;border-right:1px solid #e8e8e8">
       {team_cards_html}
-    </div>
-  </div>
+    </td>
+  </tr>
 
-  <div style="background:#08415C;border-radius:0 0 12px 12px;padding:14px 28px;display:flex;justify-content:space-between;align-items:center">
-    <div style="color:#2AB6C9;font-size:9px">carouselmedia.in · Tasks synced to Trello</div>
-    <div style="color:#fff;font-size:9px;opacity:.5">Powered by Claude AI</div>
-  </div>
+  <!-- FOOTER -->
+  <tr>
+    <td style="background:#08415C;border-radius:0 0 12px 12px;padding:14px 28px">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td style="color:#2AB6C9;font-size:9px">carouselmedia.in · Tasks synced to Trello</td>
+          <td align="right" style="color:#fff;font-size:9px;opacity:.5">Powered by Claude AI</td>
+        </tr>
+      </table>
+    </td>
+  </tr>
 
-</div>
+</table>
+</td></tr>
+</table>
 </body>
 </html>"""
     return html
+
+
 
 
 def get_gmail_service():
