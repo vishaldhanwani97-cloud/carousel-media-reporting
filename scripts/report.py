@@ -91,6 +91,21 @@ def meta_get(endpoint, params={}):
     return r.json()
 
 
+def get_account_insights_range(account_id, since, until):
+    fields = (
+        "campaign_name,campaign_id,"
+        "spend,impressions,clicks,ctr,cpc,cpm,reach,"
+        "actions,action_values,frequency"
+    )
+    data = meta_get(f"act_{account_id}/insights", {
+        "level": "campaign",
+        "time_range": json.dumps({"since": since, "until": until}),
+        "fields": fields,
+        "limit": 100
+    })
+    return data.get("data", [])
+
+
 def get_account_insights(account_id, date_preset):
     fields = (
         "campaign_name,campaign_id,"
@@ -107,8 +122,12 @@ def get_account_insights(account_id, date_preset):
 
 
 def get_all_insights(account_id):
+    from datetime import timedelta
+    day_before = (TODAY - timedelta(days=2)).strftime("%Y-%m-%d")
+    two_days_ago = (TODAY - timedelta(days=3)).strftime("%Y-%m-%d")
     return {
         "yesterday": get_account_insights(account_id, "yesterday"),
+        "day_before": get_account_insights_range(account_id, day_before, day_before),
         "last_7d": get_account_insights(account_id, "last_7d"),
         "last_14d": get_account_insights(account_id, "last_14d"),
         "last_30d": get_account_insights(account_id, "last_30d"),
@@ -478,16 +497,16 @@ def build_html_email(all_results, team, thresholds):
     BLACK = "#262626"
     WHITE = "#F3F3F3"
     BORDER = "#E8E8E8"
-    EMAIL_W = 680
-    INNER_W = 620
-    CLIENT_CARD_W = 304
-    CLIENT_GAP_W = 14
-    CLIENT_INNER_W = 264
-    METRIC_W = 128
-    METRIC_GAP_W = 8
-    TEAM_CARD_W = 304
-    TEAM_GAP_W = 14
-    TEAM_INNER_W = 264
+    EMAIL_W = 600
+    INNER_W = 560
+    CLIENT_CARD_W = 272
+    CLIENT_GAP_W = 16
+    CLIENT_INNER_W = 232
+    METRIC_W = 110
+    METRIC_GAP_W = 12
+    TEAM_CARD_W = 272
+    TEAM_GAP_W = 16
+    TEAM_INNER_W = 232
 
     def s(v):
         return escape(str(v)) if v is not None else ""
@@ -579,9 +598,21 @@ def build_html_email(all_results, team, thresholds):
         il, ibg, ic = insight_map.get(it, insight_map[None])
         p = acct.get("pacing") or {}
         try:
-            rc = "#168A43" if float(acct.get("roas_7d", 0)) >= float(acct.get("roas_goal", 0)) else "#C0392B"
+            rc = "#168A43" if float(acct.get("roas_y", 0)) >= float(acct.get("roas_goal", 0)) else "#C0392B"
         except Exception:
             rc = BLACK
+
+        def trend_tag(t):
+            if not t:
+                return ""
+            arrow = "&#9650;" if t["dir"] == "up" else "&#9660;"
+            color = "#168A43" if t["dir"] == "up" else "#C0392B"
+            return f'<span style="font-size:9px;color:{color};font-weight:900;">{arrow} {t["pct"]}%</span>'
+
+        roas_sub = "vs " + rfmt(acct.get("roas_goal",0)) + " goal " + trend_tag(acct.get("roas_trend",""))
+        rev_sub = "Prev Rs" + str(round(float(acct.get("revenue_db",0))/1000,1)) + "K " + trend_tag(acct.get("revenue_trend",""))
+        spend_sub = "CTR " + pct(acct.get("ctr_y",0))
+        purch_sub = "CPC Rs" + s(acct.get("cpc_y",0)) + " " + trend_tag(acct.get("purchases_trend",""))
         itxt = acct.get("insight_text") or "No critical action needed today."
 
         pacing_html = ""
@@ -615,13 +646,13 @@ def build_html_email(all_results, team, thresholds):
             '<tr><td style="padding:14px;background:#FFFFFF;">'
             '<table role="presentation" width="' + str(CLIENT_INNER_W) + '" cellpadding="0" cellspacing="0" border="0" style="width:' + str(CLIENT_INNER_W) + 'px;border-collapse:collapse;">'
             '<tr>'
-            + metric_box("ROAS (7D)", rfmt(acct.get("roas_7d",0)), "vs " + rfmt(acct.get("roas_goal",0)) + " goal", rc)
+            + metric_box("ROAS (Yesterday)", rfmt(acct.get("roas_y",0)), roas_sub, rc)
             + '<td width="' + str(METRIC_GAP_W) + '" style="width:' + str(METRIC_GAP_W) + 'px;font-size:0;">&nbsp;</td>'
-            + metric_box("Revenue (7D)", money(acct.get("revenue_7d",0)), "Yesterday " + money(acct.get("revenue_yesterday",0)))
+            + metric_box("Revenue (Yesterday)", money(acct.get("revenue_y",0)), rev_sub)
             + '</tr><tr><td colspan="3" height="8" style="height:8px;font-size:0;">&nbsp;</td></tr><tr>'
-            + metric_box("Spend (7D)", money(acct.get("spend_7d",0)), "CTR " + pct(acct.get("ctr_7d",0)))
+            + metric_box("Spend (Yesterday)", money(acct.get("spend_y",0)), spend_sub)
             + '<td width="' + str(METRIC_GAP_W) + '" style="width:' + str(METRIC_GAP_W) + 'px;font-size:0;">&nbsp;</td>'
-            + metric_box("Purchases", num(acct.get("purchases_7d",0)), "CPC Rs" + s(acct.get("cpc_7d",0)))
+            + metric_box("Purchases (Yesterday)", num(acct.get("purchases_y",0)), purch_sub)
             + '</tr></table></td></tr>'
             + pacing_html
             + '<tr><td style="padding:0;border-radius:0 0 8px 8px;">'
@@ -722,6 +753,7 @@ def build_html_email(all_results, team, thresholds):
         owner_name = next((t["Name"] for t in team if t["Email"] == owner_email), owner_email)
 
         y = s_data.get("yesterday", {})
+        db = s_data.get("day_before", {})
         l7 = s_data.get("last_7d", {})
         roas_7d = l7.get("roas", 0)
 
@@ -749,19 +781,43 @@ def build_html_email(all_results, team, thresholds):
                 insight_type = top.get("type")
                 insight_text = top.get("text", "")[:200]
 
+        def trend(today_val, prev_val):
+            try:
+                today_val = float(today_val or 0)
+                prev_val = float(prev_val or 0)
+                if prev_val == 0:
+                    return ""
+                change = ((today_val - prev_val) / prev_val) * 100
+                arrow = "up" if change >= 0 else "down"
+                return {"pct": round(abs(change), 1), "dir": arrow}
+            except Exception:
+                return ""
+
         accounts.append({
             "account_name": account_name,
             "owner_name": owner_name,
             "status": status,
-            "roas_7d": roas_7d,
             "roas_goal": roas_goal,
-            "revenue_7d": l7.get("revenue", 0),
-            "revenue_yesterday": y.get("revenue", 0),
-            "spend_7d": l7.get("spend", 0),
-            "ctr_7d": l7.get("ctr", 0),
-            "cpc_7d": l7.get("cpc", 0),
-            "purchases_7d": l7.get("purchases", 0),
-            "purchases_yesterday": y.get("purchases", 0),
+            # Yesterday as primary
+            "roas_y": y.get("roas", 0),
+            "revenue_y": y.get("revenue", 0),
+            "spend_y": y.get("spend", 0),
+            "purchases_y": y.get("purchases", 0),
+            "ctr_y": y.get("ctr", 0),
+            "cpc_y": y.get("cpc", 0),
+            # Day before for comparison
+            "roas_db": db.get("roas", 0),
+            "revenue_db": db.get("revenue", 0),
+            "spend_db": db.get("spend", 0),
+            "purchases_db": db.get("purchases", 0),
+            # Trends
+            "roas_trend": trend(y.get("roas",0), db.get("roas",0)),
+            "revenue_trend": trend(y.get("revenue",0), db.get("revenue",0)),
+            "spend_trend": trend(y.get("spend",0), db.get("spend",0)),
+            "purchases_trend": trend(y.get("purchases",0), db.get("purchases",0)),
+            # 7D for context
+            "roas_7d": roas_7d,
+            "roas_7d_val": l7.get("roas", 0),
             "pacing": pacing,
             "insight_type": insight_type,
             "insight_text": insight_text,
