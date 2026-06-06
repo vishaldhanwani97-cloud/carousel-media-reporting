@@ -561,7 +561,8 @@ def build_html_email(all_results, team, thresholds):
         None: ("NOTE", "#F7F7F7", "#999999"),
     }
 
-    def metric_box(label, value, sub="", vc=BLACK):
+    def metric_box(label, value, sub="", vc=BLACK, raw_sub=False):
+        sub_html = sub if raw_sub else s(sub)
         return (
             '<td width="' + str(METRIC_W) + '" valign="top" style="width:' + str(METRIC_W) + 'px;">'
             '<table role="presentation" width="' + str(METRIC_W) + '" cellpadding="0" cellspacing="0" border="0" '
@@ -569,7 +570,7 @@ def build_html_email(all_results, team, thresholds):
             '<tr><td style="padding:10px;font-family:Arial,Helvetica,sans-serif;">'
             '<div style="font-size:9px;text-transform:uppercase;color:#A5A5A5;font-weight:800;letter-spacing:.7px;">' + s(label) + '</div>'
             '<div style="font-size:18px;color:' + vc + ';font-weight:900;margin-top:5px;">' + s(value) + '</div>'
-            '<div style="font-size:10px;color:#777;font-weight:700;margin-top:2px;">' + s(sub) + '</div>'
+            '<div style="font-size:10px;color:#777;font-weight:700;margin-top:2px;">' + sub_html + '</div>'
             '</td></tr></table></td>'
         )
 
@@ -646,13 +647,13 @@ def build_html_email(all_results, team, thresholds):
             '<tr><td style="padding:14px;background:#FFFFFF;">'
             '<table role="presentation" width="' + str(CLIENT_INNER_W) + '" cellpadding="0" cellspacing="0" border="0" style="width:' + str(CLIENT_INNER_W) + 'px;border-collapse:collapse;">'
             '<tr>'
-            + metric_box("ROAS (Yesterday)", rfmt(acct.get("roas_y",0)), roas_sub, rc)
+            + metric_box("ROAS (Yesterday)", rfmt(acct.get("roas_y",0)), roas_sub, rc, raw_sub=True)
             + '<td width="' + str(METRIC_GAP_W) + '" style="width:' + str(METRIC_GAP_W) + 'px;font-size:0;">&nbsp;</td>'
-            + metric_box("Revenue (Yesterday)", money(acct.get("revenue_y",0)), rev_sub)
+            + metric_box("Revenue (Yesterday)", money(acct.get("revenue_y",0)), rev_sub, raw_sub=True)
             + '</tr><tr><td colspan="3" height="8" style="height:8px;font-size:0;">&nbsp;</td></tr><tr>'
             + metric_box("Spend (Yesterday)", money(acct.get("spend_y",0)), spend_sub)
             + '<td width="' + str(METRIC_GAP_W) + '" style="width:' + str(METRIC_GAP_W) + 'px;font-size:0;">&nbsp;</td>'
-            + metric_box("Purchases (Yesterday)", num(acct.get("purchases_y",0)), purch_sub)
+            + metric_box("Purchases (Yesterday)", num(acct.get("purchases_y",0)), purch_sub, raw_sub=True)
             + '</tr></table></td></tr>'
             + pacing_html
             + '<tr><td style="padding:0;border-radius:0 0 8px 8px;">'
