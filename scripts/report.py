@@ -45,7 +45,7 @@ def get_sheets_client():
         token_uri="https://oauth2.googleapis.com/token",
         scopes=[
             "https://www.googleapis.com/auth/gmail.send",
-            "https://www.googleapis.com/auth/spreadsheets.readonly"
+            "https://www.googleapis.com/auth/spreadsheets"
         ]
     )
     creds.refresh(Request())
