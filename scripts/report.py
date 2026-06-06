@@ -218,7 +218,7 @@ OPEN ACTIONS IN FLIGHT (do not re-flag these as new issues):
     prompt = prompt.replace("{{SEASONALITY_CONTEXT}}", "No major seasonal event active.")
     try:
         response = claude.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-5",
             max_tokens=1000,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -718,7 +718,7 @@ This will be read by an AI every morning as permanent context, so be specific an
 
     try:
         response = claude.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-5",
             max_tokens=500,
             messages=[{"role": "user", "content": prompt}]
         )
@@ -756,7 +756,7 @@ This replaces last week's digest and will be read as context next week."""
 
     try:
         response = claude.messages.create(
-            model="claude-3-5-sonnet-20241022",
+            model="claude-sonnet-4-5",
             max_tokens=300,
             messages=[{"role": "user", "content": prompt}]
         )
