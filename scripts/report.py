@@ -443,19 +443,249 @@ def status_badge(status):
 
 
 def build_html_email(all_results, team, thresholds):
+    from html import escape
+
     date_str = TODAY.strftime("%A, %d %B %Y")
-    
-    # Generate quirky greeting
     greeting, subtitle = generate_quirky_greeting(all_results, thresholds)
-    
-    # Build per-account data
-    account_cards_html = ""
+
+    ORANGE = "#F27C38"
+    NAVY = "#08415C"
+    TEAL = "#2AB6C9"
+    BLACK = "#262626"
+    WHITE = "#F3F3F3"
+    CARD_BG = "#FFFFFF"
+    BORDER = "#E8E8E8"
+    MUTED = "#8C8C8C"
+    SOFT = "#FAFAFA"
+    EMAIL_W = 680
+    INNER_W = 620
+    CLIENT_CARD_W = 304
+    CLIENT_GAP_W = 14
+    CLIENT_INNER_W = 264
+    METRIC_W = 128
+    METRIC_GAP_W = 8
+    TEAM_CARD_W = 304
+    TEAM_GAP_W = 14
+    TEAM_INNER_W = 264
+
+    def safe(v):
+        return escape(str(v)) if v is not None else ""
+
+    def money(v):
+        try:
+            v = float(v or 0)
+            if v >= 10000000:
+                return f"&#8377;{v/10000000:.2f}Cr"
+            if v >= 100000:
+                return f"&#8377;{v/100000:.1f}L"
+            if v >= 1000:
+                return f"&#8377;{v/1000:.1f}K"
+            return f"&#8377;{v:,.0f}"
+        except Exception:
+            return "&#8377;0"
+
+    def number(v):
+        try:
+            return f"{int(float(v or 0)):,}"
+        except Exception:
+            return "0"
+
+    def pct(v):
+        try:
+            return f"{float(v):.1f}%"
+        except Exception:
+            return "0.0%"
+
+    def roas_fmt(v):
+        try:
+            return f"{float(v):.2f}x"
+        except Exception:
+            return "0.00x"
+
+    def clamp_pct(v):
+        try:
+            return max(0, min(float(v), 100))
+        except Exception:
+            return 0
+
+    def bar_width(v, total_w):
+        return int((clamp_pct(v) / 100) * total_w)
+
+    status_map = {
+        "on_track": ("On Track", "#E9F8EF", "#15803D"),
+        "watch": ("Watch", "#FFF3E8", "#D96B12"),
+        "alert": ("Alert", "#FDECEC", "#C0392B"),
+        "no_data": ("No Data", "#EEEEEE", "#777777"),
+    }
+
+    insight_map = {
+        "fix": ("FIX IMMEDIATE", "#FDECEC", "#C0392B"),
+        "scale": ("SCALE OPPORTUNITY", "#E9F8EF", "#168A43"),
+        "watch": ("WATCH", "#FFF3E8", ORANGE),
+        None: ("NOTE", "#F7F7F7", "#999999"),
+    }
+
+    def metric_box(label, value, sub="", value_color=BLACK):
+        return f"""<td width="{METRIC_W}" valign="top" style="width:{METRIC_W}px;">
+            <table role="presentation" width="{METRIC_W}" cellpadding="0" cellspacing="0" border="0" style="width:{METRIC_W}px;border-collapse:separate;background:#FFFFFF;border:1px solid {BORDER};border-radius:6px;">
+                <tr><td width="{METRIC_W}" style="width:{METRIC_W}px;padding:10px 10px 9px 10px;font-family:Arial,Helvetica,sans-serif;">
+                    <div style="font-size:9px;line-height:12px;letter-spacing:.7px;text-transform:uppercase;color:#A5A5A5;font-weight:800;">{safe(label)}</div>
+                    <div style="font-size:18px;line-height:22px;color:{value_color};font-weight:900;margin-top:5px;">{safe(value)}</div>
+                    <div style="font-size:10px;line-height:13px;color:#777777;font-weight:700;margin-top:2px;">{safe(sub)}</div>
+                </td></tr>
+            </table>
+        </td>"""
+
+    def pacing_block(label, pacing_pct, expected_pct, color):
+        BAR_W = 124
+        fill = bar_width(pacing_pct, BAR_W)
+        empty = BAR_W - fill
+        return f"""<td width="{METRIC_W}" valign="top" style="width:{METRIC_W}px;font-family:Arial,Helvetica,sans-serif;">
+            <div style="font-size:10px;line-height:13px;color:#777777;font-weight:700;margin-bottom:4px;">{safe(label)}</div>
+            <table role="presentation" width="{BAR_W}" cellpadding="0" cellspacing="0" border="0" style="width:{BAR_W}px;border-collapse:collapse;background:#EFEFEF;">
+                <tr>
+                    <td width="{fill}" height="5" style="width:{fill}px;height:5px;background:{safe(color)};font-size:0;line-height:0;">&nbsp;</td>
+                    <td width="{empty}" height="5" style="width:{empty}px;height:5px;background:#EFEFEF;font-size:0;line-height:0;">&nbsp;</td>
+                </tr>
+            </table>
+            <div style="font-size:10px;line-height:13px;color:{safe(color)};font-weight:900;margin-top:4px;">{pct(pacing_pct)} <span style="color:#999999;font-weight:500;">exp. {pct(expected_pct)}</span></div>
+        </td>"""
+
+    def account_card(account):
+        status = account.get("status", "no_data")
+        status_label, status_bg, status_color = status_map.get(status, status_map["no_data"])
+        insight_type = account.get("insight_type")
+        insight_label, insight_bg, insight_color = insight_map.get(insight_type, insight_map[None])
+        pacing = account.get("pacing") or {}
+        try:
+            roas_color = "#168A43" if float(account.get("roas_7d", 0)) >= float(account.get("roas_goal", 0)) else "#C0392B"
+        except Exception:
+            roas_color = BLACK
+        insight_text = account.get("insight_text") or "No critical action needed today."
+
+        return f"""<table role="presentation" width="{CLIENT_CARD_W}" cellpadding="0" cellspacing="0" border="0" style="width:{CLIENT_CARD_W}px;border-collapse:separate;background:{CARD_BG};border:1px solid {BORDER};border-radius:8px;">
+            <tr><td width="{CLIENT_CARD_W}" style="width:{CLIENT_CARD_W}px;background:{ORANGE};border-radius:8px 8px 0 0;padding:14px 14px 13px 14px;font-family:Arial,Helvetica,sans-serif;">
+                <table role="presentation" width="276" cellpadding="0" cellspacing="0" border="0" style="width:276px;border-collapse:collapse;">
+                    <tr>
+                        <td width="195" valign="middle" style="width:195px;">
+                            <div style="font-size:14px;line-height:18px;color:#FFFFFF;font-weight:900;">{safe(account.get("account_name"))}</div>
+                            <div style="font-size:10px;line-height:14px;color:#FFE0CF;font-weight:700;">{safe(account.get("owner_name"))} &middot; Meta</div>
+                        </td>
+                        <td width="81" align="right" valign="middle" style="width:81px;">
+                            <span style="display:inline-block;background:{status_bg};color:{status_color};font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:900;padding:4px 9px;border-radius:14px;">{safe(status_label)}</span>
+                        </td>
+                    </tr>
+                </table>
+            </td></tr>
+            <tr><td width="{CLIENT_CARD_W}" style="width:{CLIENT_CARD_W}px;padding:14px 14px 12px 14px;background:#FFFFFF;">
+                <table role="presentation" width="{CLIENT_INNER_W}" cellpadding="0" cellspacing="0" border="0" style="width:{CLIENT_INNER_W}px;border-collapse:collapse;">
+                    <tr>
+                        {metric_box("ROAS (7D)", roas_fmt(account.get("roas_7d",0)), f"vs {roas_fmt(account.get('roas_goal',0))} goal", roas_color)}
+                        <td width="{METRIC_GAP_W}" style="width:{METRIC_GAP_W}px;font-size:0;">&nbsp;</td>
+                        {metric_box("Revenue (7D)", money(account.get("revenue_7d",0)), f"Yesterday {money(account.get('revenue_yesterday',0))}")}
+                    </tr>
+                    <tr><td colspan="3" height="8" style="height:8px;font-size:0;">&nbsp;</td></tr>
+                    <tr>
+                        {metric_box("Spend (7D)", money(account.get("spend_7d",0)), f"CTR {pct(account.get('ctr_7d',0))}")}
+                        <td width="{METRIC_GAP_W}" style="width:{METRIC_GAP_W}px;font-size:0;">&nbsp;</td>
+                        {metric_box("Purchases", number(account.get("purchases_7d",0)), f"CPC &#8377;{safe(account.get('cpc_7d',0))}")}
+                    </tr>
+                </table>
+            </td></tr>
+            <tr><td width="{CLIENT_CARD_W}" style="width:{CLIENT_CARD_W}px;padding:11px 14px 13px 14px;background:#FAFAFA;border-top:1px solid #EEEEEE;font-family:Arial,Helvetica,sans-serif;">
+                <div style="font-size:10px;color:#A1A1A1;font-weight:900;text-transform:uppercase;letter-spacing:.9px;margin-bottom:9px;">June Pacing &mdash; Day {safe(pacing.get("days_elapsed",""))} of {safe(pacing.get("days_in_month",""))}</div>
+                <table role="presentation" width="{CLIENT_INNER_W}" cellpadding="0" cellspacing="0" border="0" style="width:{CLIENT_INNER_W}px;border-collapse:collapse;">
+                    <tr>
+                        {pacing_block("Budget", pacing.get("budget_pacing_pct",0), pacing.get("expected_pct",0), pacing.get("budget_color", ORANGE))}
+                        <td width="{METRIC_GAP_W}" style="width:{METRIC_GAP_W}px;font-size:0;">&nbsp;</td>
+                        {pacing_block("Revenue", pacing.get("revenue_pacing_pct",0), pacing.get("expected_pct",0), pacing.get("revenue_color", ORANGE))}
+                    </tr>
+                </table>
+            </td></tr>
+            <tr><td width="{CLIENT_CARD_W}" style="width:{CLIENT_CARD_W}px;padding:0;background:#FFFFFF;border-radius:0 0 8px 8px;">
+                <table role="presentation" width="{CLIENT_CARD_W}" cellpadding="0" cellspacing="0" border="0" style="width:{CLIENT_CARD_W}px;border-collapse:collapse;background:{insight_bg};border-radius:0 0 8px 8px;">
+                    <tr>
+                        <td width="4" style="width:4px;background:{insight_color};font-size:0;">&nbsp;</td>
+                        <td style="padding:12px 14px 13px 14px;font-family:Arial,Helvetica,sans-serif;">
+                            <div style="font-size:10px;color:{insight_color};font-weight:900;text-transform:uppercase;letter-spacing:.8px;">{safe(insight_label)}</div>
+                            <div style="font-size:11px;color:{BLACK};font-weight:500;margin-top:5px;line-height:16px;">{safe(insight_text)}</div>
+                        </td>
+                    </tr>
+                </table>
+            </td></tr>
+        </table>"""
+
+    def account_rows(accounts_list):
+        rows = []
+        for i in range(0, len(accounts_list), 2):
+            left = account_card(accounts_list[i])
+            right = account_card(accounts_list[i+1]) if i+1 < len(accounts_list) else ""
+            rows.append(f"""<tr>
+                <td width="{CLIENT_CARD_W}" valign="top" style="width:{CLIENT_CARD_W}px;">{left}</td>
+                <td width="{CLIENT_GAP_W}" style="width:{CLIENT_GAP_W}px;font-size:0;">&nbsp;</td>
+                <td width="{CLIENT_CARD_W}" valign="top" style="width:{CLIENT_CARD_W}px;">{right}</td>
+            </tr>
+            <tr><td colspan="3" height="14" style="height:14px;font-size:0;">&nbsp;</td></tr>""")
+        return "".join(rows)
+
+    def task_row(task):
+        return f"""<tr>
+            <td width="16" valign="top" style="width:16px;padding:8px 0;">
+                <table role="presentation" width="7" cellpadding="0" cellspacing="0" border="0" style="width:7px;border-collapse:collapse;">
+                    <tr><td width="7" height="7" style="width:7px;height:7px;background:{safe(task.get("color",ORANGE))};border-radius:7px;font-size:0;">&nbsp;</td></tr>
+                </table>
+            </td>
+            <td width="74" valign="top" style="width:74px;padding:6px 6px 6px 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:{BLACK};font-weight:900;">{safe(task.get("account"))}</td>
+            <td width="124" valign="top" style="width:124px;padding:6px 6px 6px 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#555555;">{safe(task.get("action"))}</td>
+            <td width="40" align="right" valign="top" style="width:40px;padding:6px 0;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:{ORANGE};font-weight:900;">{safe(task.get("deadline"))}</td>
+        </tr>"""
+
+    def team_card(member):
+        tasks = member.get("tasks") or []
+        if tasks:
+            task_html = "".join(task_row(t) for t in tasks)
+            body = f"""<tr><td style="padding:10px 14px 14px 14px;">
+                <table role="presentation" width="{TEAM_INNER_W}" cellpadding="0" cellspacing="0" border="0" style="width:{TEAM_INNER_W}px;border-collapse:collapse;">{task_html}</table>
+            </td></tr>"""
+        else:
+            body = f"""<tr><td style="padding:18px 14px 22px 14px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999999;font-style:italic;">All good &mdash; no action needed today.</td></tr>"""
+
+        return f"""<table role="presentation" width="{TEAM_CARD_W}" cellpadding="0" cellspacing="0" border="0" style="width:{TEAM_CARD_W}px;border-collapse:separate;background:#FFFFFF;border:1px solid {BORDER};border-radius:8px;">
+            <tr><td width="{TEAM_CARD_W}" style="width:{TEAM_CARD_W}px;background:{NAVY};border-radius:8px 8px 0 0;padding:13px 14px;font-family:Arial,Helvetica,sans-serif;">
+                <table role="presentation" width="{TEAM_INNER_W}" cellpadding="0" cellspacing="0" border="0" style="width:{TEAM_INNER_W}px;border-collapse:collapse;">
+                    <tr>
+                        <td width="42" valign="middle" style="width:42px;">
+                            <table role="presentation" width="32" cellpadding="0" cellspacing="0" border="0" style="width:32px;border-collapse:collapse;">
+                                <tr><td width="32" height="32" align="center" valign="middle" style="width:32px;height:32px;background:{ORANGE};border-radius:32px;font-family:Arial,Helvetica,sans-serif;color:#FFFFFF;font-size:11px;line-height:32px;font-weight:900;">{safe(member.get("initials"))}</td></tr>
+                            </table>
+                        </td>
+                        <td width="222" valign="middle" style="width:222px;padding-left:8px;">
+                            <div style="font-size:14px;color:#FFFFFF;font-weight:900;">{safe(member.get("name"))}</div>
+                            <div style="font-size:10px;color:{TEAL};font-weight:700;margin-top:2px;">{safe(member.get("role"))}</div>
+                        </td>
+                    </tr>
+                </table>
+            </td></tr>
+            {body}
+        </table>"""
+
+    def team_rows(team_list):
+        rows = []
+        for i in range(0, len(team_list), 2):
+            left = team_card(team_list[i])
+            right = team_card(team_list[i+1]) if i+1 < len(team_list) else ""
+            rows.append(f"""<tr>
+                <td width="{TEAM_CARD_W}" valign="top" style="width:{TEAM_CARD_W}px;">{left}</td>
+                <td width="{TEAM_GAP_W}" style="width:{TEAM_GAP_W}px;font-size:0;">&nbsp;</td>
+                <td width="{TEAM_CARD_W}" valign="top" style="width:{TEAM_CARD_W}px;">{right}</td>
+            </tr>
+            <tr><td colspan="3" height="14" style="height:14px;font-size:0;">&nbsp;</td></tr>""")
+        return "".join(rows)
+
+    # Build accounts and team data
+    accounts = []
     tasks_by_owner = {}
-    total_alerts = 0
-    high_alerts = 0
-    on_track_count = 0
-    needs_attention_count = 0
-    
+
     for result in all_results:
         s = result["summary"]
         account = result["account"]
@@ -464,312 +694,156 @@ def build_html_email(all_results, team, thresholds):
         roas_goal = float(thresh.get("ROAS Goal", 2.0))
         owner_email = account.get("Owner", "")
         owner_name = next((t["Name"] for t in team if t["Email"] == owner_email), owner_email)
-        
+
         y = s.get("yesterday", {})
         l7 = s.get("last_7d", {})
-        
         roas_7d = l7.get("roas", 0)
+
         if l7.get("spend", 0) == 0:
             status = "no_data"
         elif roas_7d >= roas_goal:
             status = "on_track"
-            on_track_count += 1
         elif roas_7d >= roas_goal * 0.8:
             status = "watch"
-            needs_attention_count += 1
         else:
             status = "alert"
-            needs_attention_count += 1
-        
-        badge_map = {
-            "on_track": ('<span style="background:#e8f5ef;color:#1a7a4a;font-size:9px;'
-                        'font-weight:700;padding:3px 8px;border-radius:20px">On Track</span>'),
-            "watch": ('<span style="background:#fff3e0;color:#e65100;font-size:9px;'
-                     'font-weight:700;padding:3px 8px;border-radius:20px">Watch</span>'),
-            "alert": ('<span style="background:#fdecea;color:#c0392b;font-size:9px;'
-                     'font-weight:700;padding:3px 8px;border-radius:20px">Alert</span>'),
-            "no_data": ('<span style="background:#f0f0f0;color:#888;font-size:9px;'
-                       'font-weight:700;padding:3px 8px;border-radius:20px">No Data</span>'),
-        }
-        badge = badge_map.get(status, badge_map["no_data"])
-        
-        roas_color = "#1a7a4a" if roas_7d >= roas_goal else "#d68910" if roas_7d >= roas_goal * 0.8 else "#c0392b"
-        
-        # Pacing
+
         pacing = result.get("pacing")
-        pacing_html = ""
-        if pacing:
-            def bar_color(status):
-                return "#1a7a4a" if status == "on_pace" else "#d68910" if status == "overpacing" else "#c0392b"
-            def bar_label(status):
-                return "On Pace" if status == "on_pace" else "Overpacing" if status == "overpacing" else "Behind"
-            
-            b_color = bar_color(pacing["budget_status"])
-            r_color = bar_color(pacing["revenue_status"])
-            b_width = min(pacing["budget_pacing_pct"], 100)
-            r_width = min(pacing["revenue_pacing_pct"], 100)
-            
-            pacing_html = f"""
-            <div style="padding:10px 14px;border-bottom:1px solid #f0f0f0;background:#fff">
-              <div style="font-size:9px;color:#aaa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;font-weight:700">
-                June Pacing — Day {pacing["days_elapsed"]} of {pacing["days_in_month"]}
-              </div>
-              <div style="display:flex;gap:10px">
-                <div style="flex:1">
-                  <div style="font-size:9px;color:#888;margin-bottom:3px">Budget</div>
-                  <div style="background:#f0f0f0;border-radius:3px;height:4px;width:100%">
-                    <div style="width:{b_width}%;height:4px;border-radius:3px;background:{b_color}"></div>
-                  </div>
-                  <div style="display:flex;justify-content:space-between;margin-top:3px">
-                    <span style="font-size:9px;font-weight:700;color:{b_color}">{pacing["budget_pacing_pct"]}% · {bar_label(pacing["budget_status"])}</span>
-                    <span style="font-size:9px;color:#aaa">exp. {pacing["expected_pct"]}%</span>
-                  </div>
-                </div>
-                <div style="flex:1">
-                  <div style="font-size:9px;color:#888;margin-bottom:3px">Revenue</div>
-                  <div style="background:#f0f0f0;border-radius:3px;height:4px;width:100%">
-                    <div style="width:{r_width}%;height:4px;border-radius:3px;background:{r_color}"></div>
-                  </div>
-                  <div style="display:flex;justify-content:space-between;margin-top:3px">
-                    <span style="font-size:9px;font-weight:700;color:{r_color}">{pacing["revenue_pacing_pct"]}% · {bar_label(pacing["revenue_status"])}</span>
-                    <span style="font-size:9px;color:#aaa">exp. {pacing["expected_pct"]}%</span>
-                  </div>
-                </div>
-              </div>
-            </div>"""
-        
-        # Insight/Alert block
-        insight_html = ""
-        insights = result.get("claude_insights", {}).get("insights", [])
         alerts_list = result.get("alerts", [])
-        
-        total_alerts += len(alerts_list)
-        high_alerts += len([a for a in alerts_list if a["severity"] == "high"])
-        
+        insights = result.get("claude_insights", {}).get("insights", [])
+
+        insight_type = None
+        insight_text = "No critical action needed today."
         if alerts_list:
-            top_alert = alerts_list[0]
-            insight_html = f"""
-            <div style="padding:10px 14px;background:#fdecea;border-left:3px solid #c0392b">
-              <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#c0392b;margin-bottom:2px">
-                Fix · {'Immediate' if top_alert['severity'] == 'high' else 'Today EOD'}
-              </div>
-              <div style="font-size:10px;color:#444;line-height:1.5">{top_alert['message']}</div>
-            </div>"""
+            insight_type = "fix"
+            insight_text = alerts_list[0]["message"]
         elif insights:
-            top = insights[0]
-            border_color = "#1a7a4a" if top.get("type") == "scale" else "#d68910"
-            label_color = "#1a7a4a" if top.get("type") == "scale" else "#d68910"
-            label = top.get("type", "watch").upper()
-            insight_html = f"""
-            <div style="padding:10px 14px;background:#fff;border-left:3px solid {border_color}">
-              <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:{label_color};margin-bottom:2px">
-                {label}
-              </div>
-              <div style="font-size:10px;color:#444;line-height:1.5">{top.get('text','')[:120]}</div>
-            </div>"""
-        
-        # Build tasks for this owner
+            top = next((i for i in insights if i.get("type") in ["fix","scale","watch"]), None)
+            if top:
+                insight_type = top.get("type")
+                insight_text = top.get("text","")[:200]
+
+        accounts.append({
+            "account_name": account_name,
+            "owner_name": owner_name,
+            "status": status,
+            "roas_7d": roas_7d,
+            "roas_goal": roas_goal,
+            "revenue_7d": l7.get("revenue", 0),
+            "revenue_yesterday": y.get("revenue", 0),
+            "spend_7d": l7.get("spend", 0),
+            "ctr_7d": l7.get("ctr", 0),
+            "cpc_7d": l7.get("cpc", 0),
+            "purchases_7d": l7.get("purchases", 0),
+            "purchases_yesterday": y.get("purchases", 0),
+            "pacing": pacing,
+            "insight_type": insight_type,
+            "insight_text": insight_text,
+        })
+
         if owner_email not in tasks_by_owner:
-            role = next((t.get("Role", "") for t in team if t["Email"] == owner_email), "")
-            tasks_by_owner[owner_email] = {
-                "name": owner_name,
-                "role": role,
-                "email": owner_email,
-                "tasks": []
-            }
-        
-        # Add max 1 task per account — top priority only
+            role = next((t.get("Role","") for t in team if t["Email"] == owner_email), "")
+            initials = "".join([n[0].upper() for n in owner_name.split()[:2]])
+            tasks_by_owner[owner_email] = {"name": owner_name, "initials": initials, "role": role, "tasks": []}
+
         if alerts_list:
             top = alerts_list[0]
             tasks_by_owner[owner_email]["tasks"].append({
-                "account": account_name,
-                "action": top["message"],
-                "deadline": "Now" if top["severity"] == "high" else "Today EOD",
-                "color": "#c0392b" if top["severity"] == "high" else "#d68910"
+                "account": account_name[:12],
+                "action": top["message"][:90],
+                "deadline": "Now" if top["severity"] == "high" else "EOD",
+                "color": "#C0392B" if top["severity"] == "high" else "#D66A16"
             })
         elif insights:
-            top_ins = next((i for i in insights if i.get("type") in ["fix", "scale"]), None)
+            top_ins = next((i for i in insights if i.get("type") in ["fix","scale"]), None)
             if top_ins:
                 tasks_by_owner[owner_email]["tasks"].append({
-                    "account": account_name,
-                    "action": top_ins.get("text", "")[:120],
-                    "deadline": "Today EOD",
-                    "color": "#c0392b" if top_ins.get("type") == "fix" else "#1a7a4a"
+                    "account": account_name[:12],
+                    "action": top_ins.get("text","")[:90],
+                    "deadline": "EOD",
+                    "color": "#C0392B" if top_ins.get("type") == "fix" else "#168A43"
                 })
-        
-        # Card HTML
-        account_cards_html += f"""
-        <div style="border:1px solid #e8e8e8;border-radius:10px;overflow:hidden">
-          <div style="background:#F27C38;padding:12px 14px;display:flex;justify-content:space-between;align-items:flex-start">
-            <div>
-              <div style="color:#fff;font-size:12px;font-weight:700">{account_name}</div>
-              <div style="color:rgba(255,255,255,0.85);font-size:9px;margin-top:2px;font-weight:500">{owner_name} · Meta</div>
-            </div>
-            {badge}
-          </div>
-          <div style="padding:12px 14px;display:grid;grid-template-columns:1fr 1fr;gap:8px;background:#fafafa;border-bottom:1px solid #f0f0f0">
-            <div style="background:#fff;border-radius:6px;padding:8px 10px;border:1px solid #f0f0f0">
-              <div style="font-size:8px;color:#aaa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;font-weight:600">ROAS (7D)</div>
-              <div style="font-size:14px;font-weight:700;color:{roas_color}">{roas_7d}x</div>
-              <div style="font-size:9px;margin-top:1px;font-weight:600;color:#888">vs {roas_goal}x goal</div>
-            </div>
-            <div style="background:#fff;border-radius:6px;padding:8px 10px;border:1px solid #f0f0f0">
-              <div style="font-size:8px;color:#aaa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;font-weight:600">Revenue (7D)</div>
-              <div style="font-size:14px;font-weight:700;color:#262626">₹{l7.get('revenue',0):,.0f}</div>
-              <div style="font-size:9px;margin-top:1px;font-weight:600;color:#888">Yest ₹{y.get('revenue',0):,.0f}</div>
-            </div>
-            <div style="background:#fff;border-radius:6px;padding:8px 10px;border:1px solid #f0f0f0">
-              <div style="font-size:8px;color:#aaa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;font-weight:600">Spend (7D)</div>
-              <div style="font-size:14px;font-weight:700;color:#262626">₹{l7.get('spend',0):,.0f}</div>
-              <div style="font-size:9px;margin-top:1px;font-weight:600;color:#888">CTR {l7.get('ctr',0)}%</div>
-            </div>
-            <div style="background:#fff;border-radius:6px;padding:8px 10px;border:1px solid #f0f0f0">
-              <div style="font-size:8px;color:#aaa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px;font-weight:600">Purchases</div>
-              <div style="font-size:14px;font-weight:700;color:#262626">{l7.get('purchases',0)}</div>
-              <div style="font-size:9px;margin-top:1px;font-weight:600;color:#888">CPC ₹{l7.get('cpc',0):,.0f}</div>
-            </div>
-          </div>
-          {pacing_html}
-          {insight_html}
-        </div>"""
-    
-    # Build team cards
-    # Make sure all team members appear even with no tasks
+
     for t in team:
         if t["Email"] not in tasks_by_owner:
             tasks_by_owner[t["Email"]] = {
                 "name": t["Name"],
-                "role": t.get("Role", ""),
-                "email": t["Email"],
+                "initials": "".join([n[0].upper() for n in t["Name"].split()[:2]]),
+                "role": t.get("Role",""),
                 "tasks": []
             }
-    
-    team_cards_html = ""
-    for owner_email, og in tasks_by_owner.items():
-        initials = "".join([n[0].upper() for n in og["name"].split()[:2]])
-        tasks_html = ""
-        if og["tasks"]:
-            for task in og["tasks"]:
-                tasks_html += f"""
-                <div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px solid #f8f8f8;align-items:flex-start">
-                  <div style="width:6px;height:6px;border-radius:50%;background:{task['color']};margin-top:4px;flex-shrink:0"></div>
-                  <div style="font-size:10px;font-weight:700;color:#262626;min-width:70px;flex-shrink:0">{task['account'][:12]}</div>
-                  <div style="font-size:10px;color:#555;flex:1;line-height:1.4">{task['action'][:80]}</div>
-                  <div style="font-size:9px;font-weight:700;white-space:nowrap;color:#F27C38">{task['deadline']}</div>
-                </div>"""
-        else:
-            tasks_html = '<div style="font-size:10px;color:#aaa;font-style:italic;padding:6px 0">All good — no action needed today.</div>'
-        
-        team_cards_html += f"""
-        <div style="border:1px solid #e8e8e8;border-radius:10px;overflow:hidden">
-          <div style="background:#08415C;padding:10px 14px;display:flex;align-items:center;gap:10px">
-            <div style="width:32px;height:32px;border-radius:50%;background:#F27C38;display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;flex-shrink:0">{initials}</div>
-            <div>
-              <div style="color:#fff;font-size:12px;font-weight:700">{og['name']}</div>
-              <div style="color:#2AB6C9;font-size:9px;margin-top:1px">{og['role']}</div>
-            </div>
-          </div>
-          <div style="padding:10px 14px">{tasks_html}</div>
-        </div>"""
-    
-    total_clients = len(all_results)
-    
-    html = f"""<!DOCTYPE html>
+
+    team_list = list(tasks_by_owner.values())
+    clients_html = account_rows(accounts)
+    team_html_str = team_rows(team_list)
+
+    return f"""<!doctype html>
 <html>
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <meta charset="utf-8">
+    <meta name="x-apple-disable-message-reformatting">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Carousel Media Daily Report</title>
 </head>
-<body style="margin:0;padding:0;background:#f0f0f0;font-family:'Montserrat',Arial,sans-serif">
-
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#f0f0f0">
-<tr><td align="center" style="padding:20px">
-<table width="640" cellpadding="0" cellspacing="0" border="0" style="max-width:640px">
-
-  <!-- HEADER -->
-  <tr>
-    <td style="background:#08415C;border-radius:12px 12px 0 0;padding:20px 28px">
-      <table width="100%" cellpadding="0" cellspacing="0" border="0">
-        <tr>
-          <td>
-            <table cellpadding="0" cellspacing="0" border="0">
-              <tr>
-                <td style="background:#F27C38;border-radius:8px;width:36px;height:36px;text-align:center;vertical-align:middle">
-                  <span style="color:#fff;font-size:18px;font-weight:900">C</span>
+<body style="margin:0;padding:0;background:{WHITE};font-family:Arial,Helvetica,sans-serif;">
+<center style="width:100%;background:{WHITE};">
+<table role="presentation" width="{EMAIL_W}" cellpadding="0" cellspacing="0" border="0" style="width:{EMAIL_W}px;border-collapse:collapse;background:{WHITE};">
+<tr><td style="padding:14px 20px 0 20px;">
+<table role="presentation" width="{INNER_W}" cellpadding="0" cellspacing="0" border="0" style="width:{INNER_W}px;border-collapse:collapse;background:{NAVY};border-radius:10px 10px 0 0;">
+<tr>
+    <td width="360" valign="middle" style="width:360px;padding:24px 28px;font-family:Arial,Helvetica,sans-serif;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
+            <tr>
+                <td width="58" valign="middle" style="width:58px;">
+                    <table role="presentation" width="42" cellpadding="0" cellspacing="0" border="0" style="width:42px;border-collapse:collapse;">
+                        <tr><td width="42" height="42" align="center" valign="middle" style="width:42px;height:42px;background:{ORANGE};border-radius:8px;font-family:Arial,Helvetica,sans-serif;color:#FFFFFF;font-size:23px;line-height:42px;font-weight:900;">C</td></tr>
+                    </table>
                 </td>
-                <td style="padding-left:10px">
-                  <div style="color:#fff;font-size:15px;font-weight:700;letter-spacing:.5px">CAROUSEL MEDIA</div>
-                  <div style="color:#2AB6C9;font-size:9px;font-weight:600;margin-top:2px;letter-spacing:.06em;text-transform:uppercase">Daily Performance Report</div>
+                <td valign="middle" style="padding-left:10px;">
+                    <div style="font-size:21px;line-height:25px;color:#FFFFFF;font-weight:900;letter-spacing:.4px;">CAROUSEL MEDIA</div>
+                    <div style="font-size:11px;line-height:15px;color:{TEAL};font-weight:900;letter-spacing:1.1px;text-transform:uppercase;margin-top:3px;">Daily Performance Report</div>
                 </td>
-              </tr>
-            </table>
-          </td>
-          <td align="right">
-            <div style="color:#fff;font-size:11px;font-weight:600">{date_str}</div>
-            <div style="color:#2AB6C9;font-size:10px;margin-top:3px">Generated 8:00 AM IST</div>
-          </td>
-        </tr>
-      </table>
+            </tr>
+        </table>
     </td>
-  </tr>
-
-  <!-- QUIRKY BAR -->
-  <tr>
-    <td style="background:#F27C38;padding:14px 28px;text-align:center">
-      <div style="color:#fff;font-size:13px;font-weight:700">{greeting}</div>
-      <div style="color:rgba(255,255,255,0.85);font-size:10px;margin-top:5px">{subtitle}</div>
+    <td width="260" align="right" valign="middle" style="width:260px;padding:24px 28px;font-family:Arial,Helvetica,sans-serif;">
+        <div style="font-size:14px;color:#FFFFFF;font-weight:900;">{date_str}</div>
+        <div style="font-size:11px;color:{TEAL};font-weight:700;margin-top:6px;">Generated 8:00 AM IST</div>
     </td>
-  </tr>
-
-  <!-- CLIENT SNAPSHOTS LABEL -->
-  <tr>
-    <td style="background:#fff;padding:20px 28px 12px;border-left:1px solid #e8e8e8;border-right:1px solid #e8e8e8">
-      <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#999">Client Snapshots</div>
-    </td>
-  </tr>
-
-  <!-- CLIENT CARDS -->
-  <tr>
-    <td style="background:#fff;padding:0 28px 20px;border-left:1px solid #e8e8e8;border-right:1px solid #e8e8e8">
-      {account_cards_html}
-    </td>
-  </tr>
-
-  <!-- WAR ROOM LABEL -->
-  <tr>
-    <td style="background:#fff;padding:20px 28px 12px;border-left:1px solid #e8e8e8;border-right:1px solid #e8e8e8;border-top:1px solid #f0f0f0">
-      <div style="font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#999">Today's War Room</div>
-    </td>
-  </tr>
-
-  <!-- TEAM CARDS -->
-  <tr>
-    <td style="background:#fff;padding:0 28px 20px;border-left:1px solid #e8e8e8;border-right:1px solid #e8e8e8">
-      {team_cards_html}
-    </td>
-  </tr>
-
-  <!-- FOOTER -->
-  <tr>
-    <td style="background:#08415C;border-radius:0 0 12px 12px;padding:14px 28px">
-      <table width="100%" cellpadding="0" cellspacing="0" border="0">
-        <tr>
-          <td style="color:#2AB6C9;font-size:9px">carouselmedia.in · Tasks synced to Trello</td>
-          <td align="right" style="color:#fff;font-size:9px;opacity:.5">Powered by Claude AI</td>
-        </tr>
-      </table>
-    </td>
-  </tr>
-
+</tr>
 </table>
+<table role="presentation" width="{INNER_W}" cellpadding="0" cellspacing="0" border="0" style="width:{INNER_W}px;border-collapse:collapse;background:{ORANGE};">
+<tr><td align="center" style="padding:16px 30px 15px 30px;font-family:Arial,Helvetica,sans-serif;">
+    <div style="font-size:15px;color:#FFFFFF;font-weight:900;">{greeting}</div>
+    <div style="font-size:12px;color:#FFE2D1;font-weight:800;margin-top:4px;">{subtitle}</div>
 </td></tr>
 </table>
+<table role="presentation" width="{INNER_W}" cellpadding="0" cellspacing="0" border="0" style="width:{INNER_W}px;border-collapse:collapse;background:#FFFFFF;">
+<tr><td style="padding:22px 28px 12px 28px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999999;font-weight:900;text-transform:uppercase;letter-spacing:1.6px;">Client Snapshots</td></tr>
+<tr><td style="padding:0 28px 4px 28px;">
+    <table role="presentation" width="{INNER_W - 56}" cellpadding="0" cellspacing="0" border="0" style="width:{INNER_W - 56}px;border-collapse:collapse;">
+        {clients_html}
+    </table>
+</td></tr>
+<tr><td style="padding:18px 28px 12px 28px;border-top:1px solid #EEEEEE;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999999;font-weight:900;text-transform:uppercase;letter-spacing:1.6px;">Today's War Room</td></tr>
+<tr><td style="padding:0 28px 8px 28px;">
+    <table role="presentation" width="{INNER_W - 56}" cellpadding="0" cellspacing="0" border="0" style="width:{INNER_W - 56}px;border-collapse:collapse;">
+        {team_html_str}
+    </table>
+</td></tr>
+</table>
+<table role="presentation" width="{INNER_W}" cellpadding="0" cellspacing="0" border="0" style="width:{INNER_W}px;border-collapse:collapse;background:{NAVY};border-radius:0 0 10px 10px;">
+<tr>
+    <td width="310" style="width:310px;padding:15px 28px;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:{TEAL};">carouselmedia.in &middot; Tasks synced to Trello</td>
+    <td width="310" align="right" style="width:310px;padding:15px 28px;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#A9C7D3;">Powered by Claude AI</td>
+</tr>
+</table>
+</td></tr>
+<tr><td height="26" style="height:26px;font-size:0;">&nbsp;</td></tr>
+</table>
+</center>
 </body>
-</html>"""
-    return html
-
-
+</html>
 
 
 def get_gmail_service():
