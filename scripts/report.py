@@ -11,6 +11,8 @@ import anthropic
 import gspread
 import pytz
 from datetime import datetime, timedelta
+from calendar import monthrange
+from html import escape
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from google.oauth2.credentials import Credentials
@@ -57,33 +59,28 @@ def load_config():
     sh = gc.open_by_key(SHEETS_ID)
     accounts = [a for a in sh.worksheet("Accounts").get_all_records()
                 if str(a.get("Active", "")).upper() == "Y"]
-    thresholds = {r["Account Name"]: r
-                  for r in sh.worksheet("Thresholds").get_all_records()}
+    thresholds = {r["Account Name"]: r for r in sh.worksheet("Thresholds").get_all_records()}
     prompts = {r["Prompt Name"]: r["Prompt Text"]
                for r in sh.worksheet("Prompts").get_all_records()
                if str(r.get("Active", "")).upper() == "Y"}
     team = sh.worksheet("Team").get_all_records()
-    
-    # Load DNA, Weekly Digest, Action Log
     try:
-        dna_records = sh.worksheet("Account DNA").get_all_records()
-        dna = {r["Account Name"]: r.get("DNA", "") for r in dna_records if r.get("Account Name")}
-    except:
+        dna = {r["Account Name"]: r.get("DNA", "")
+               for r in sh.worksheet("Account DNA").get_all_records()
+               if r.get("Account Name")}
+    except Exception:
         dna = {}
-    
     try:
-        digest_records = sh.worksheet("Weekly Digest").get_all_records()
-        digests = {r["Account Name"]: r.get("Digest", "") for r in digest_records if r.get("Account Name")}
-    except:
+        digests = {r["Account Name"]: r.get("Digest", "")
+                   for r in sh.worksheet("Weekly Digest").get_all_records()
+                   if r.get("Account Name")}
+    except Exception:
         digests = {}
-    
     try:
-        action_records = sh.worksheet("Action Log").get_all_records()
-        open_actions = [r for r in action_records 
-                       if str(r.get("Status", "")).lower() == "open"]
-    except:
+        open_actions = [r for r in sh.worksheet("Action Log").get_all_records()
+                        if str(r.get("Status", "")).lower() == "open"]
+    except Exception:
         open_actions = []
-    
     return accounts, thresholds, prompts, team, dna, digests, open_actions
 
 
@@ -163,11 +160,8 @@ def analyse_account(account, insights, summary, thresholds, prompts,
     thresh = thresholds.get(account["Account Name"], {})
     base_prompt = prompts.get("overview_insights", "")
     account_name = account["Account Name"]
-    
-    # Filter open actions for this account
-    account_actions = [a for a in (open_actions or []) 
-                      if a.get("Account Name") == account_name]
-    
+    account_actions = [a for a in (open_actions or [])
+                       if a.get("Account Name") == account_name]
     payload = {
         "account_name": account_name,
         "goals": {
@@ -183,36 +177,18 @@ def analyse_account(account, insights, summary, thresholds, prompts,
         },
         "campaigns": {"last_7d": insights.get("last_7d", [])[:5]}
     }
-    
-    # Build enriched prompt with memory layers
     context_block = ""
-    
     if dna:
-        context_block += f"""
-ACCOUNT DNA (permanent knowledge — always apply this):
-{dna}
-
-"""
-    
+        context_block += f"ACCOUNT DNA (permanent knowledge):\n{dna}\n\n"
     if digest:
-        context_block += f"""
-LAST WEEK DIGEST (what happened recently):
-{digest}
-
-"""
-    
+        context_block += f"LAST WEEK DIGEST:\n{digest}\n\n"
     if account_actions:
         actions_text = "\n".join([
-            f"- {a.get('Action Taken','')} (logged {a.get('Date','')}, "
-            f"expected resolution {a.get('Expected Resolution Date','')})"
+            f"- {a.get('Action Taken', '')} (logged {a.get('Date', '')}, "
+            f"expected resolution {a.get('Expected Resolution Date', '')})"
             for a in account_actions
         ])
-        context_block += f"""
-OPEN ACTIONS IN FLIGHT (do not re-flag these as new issues):
-{actions_text}
-
-"""
-    
+        context_block += f"OPEN ACTIONS IN FLIGHT (do not re-flag):\n{actions_text}\n\n"
     prompt = context_block + base_prompt
     prompt = prompt.replace("{{OVERVIEW_DATA}}", json.dumps(payload))
     prompt = prompt.replace("{{SEASONALITY_CONTEXT}}", "No major seasonal event active.")
@@ -244,35 +220,73 @@ def detect_anomalies(account_name, summary, thresholds):
 
     if l7d.get("roas", 0) < roas_min and l7d.get("spend", 0) > 0:
         alerts.append({
-            "type": "roas_low", "severity": "high",
-            "metric": "ROAS",
+            "type": "roas_low", "severity": "high", "metric": "ROAS",
             "message": f"ROAS {l7d['roas']}x below minimum {roas_min}x"
         })
     if l30d.get("cpm", 0) > 0 and l7d.get("cpm", 0) > 0:
         change = (l7d["cpm"] - l30d["cpm"]) / l30d["cpm"]
         if change > cpm_max_pct:
             alerts.append({
-                "type": "cpm_spike", "severity": "medium",
-                "metric": "CPM",
-                "message": f"CPM up {round(change*100)}% vs 30D avg (₹{l7d['cpm']} vs ₹{l30d['cpm']})"
+                "type": "cpm_spike", "severity": "medium", "metric": "CPM",
+                "message": f"CPM up {round(change*100)}% vs 30D avg (Rs{l7d['cpm']} vs Rs{l30d['cpm']})"
             })
     if l30d.get("cpc", 0) > 0 and l7d.get("cpc", 0) > 0:
         change = (l7d["cpc"] - l30d["cpc"]) / l30d["cpc"]
         if change > cpc_max_pct:
             alerts.append({
-                "type": "cpc_spike", "severity": "medium",
-                "metric": "CPC",
-                "message": f"CPC up {round(change*100)}% vs 30D avg (₹{l7d['cpc']} vs ₹{l30d['cpc']})"
+                "type": "cpc_spike", "severity": "medium", "metric": "CPC",
+                "message": f"CPC up {round(change*100)}% vs 30D avg (Rs{l7d['cpc']} vs Rs{l30d['cpc']})"
             })
     if l30d.get("ctr", 0) > 0 and l7d.get("ctr", 0) > 0:
         change = (l30d["ctr"] - l7d["ctr"]) / l30d["ctr"]
         if change > ctr_drop_pct:
             alerts.append({
-                "type": "ctr_drop", "severity": "medium",
-                "metric": "CTR",
+                "type": "ctr_drop", "severity": "medium", "metric": "CTR",
                 "message": f"CTR dropped {round(change*100)}% vs 30D avg ({l7d['ctr']}% vs {l30d['ctr']}%)"
             })
     return alerts
+
+
+def calculate_pacing(account_name, summary, thresholds):
+    thresh = thresholds.get(account_name, {})
+    monthly_budget = float(thresh.get("Monthly Budget Goal", 0))
+    monthly_revenue = float(thresh.get("Monthly Revenue Goal", 0))
+    if monthly_budget == 0 and monthly_revenue == 0:
+        return None
+    days_in_month = monthrange(TODAY.year, TODAY.month)[1]
+    days_elapsed = TODAY.day
+    pct_month_elapsed = days_elapsed / days_in_month
+    mtd_spend = summary.get("last_30d", {}).get("spend", 0)
+    mtd_revenue = summary.get("last_30d", {}).get("revenue", 0)
+    budget_pacing = (mtd_spend / monthly_budget * 100) if monthly_budget > 0 else 0
+    revenue_pacing = (mtd_revenue / monthly_revenue * 100) if monthly_revenue > 0 else 0
+    expected_pct = pct_month_elapsed * 100
+
+    def pacing_status(actual, expected):
+        if actual >= expected * 1.15:
+            return "overpacing", "#d68910"
+        elif actual >= expected * 0.85:
+            return "on_pace", "#1a7a4a"
+        else:
+            return "underpacing", "#c0392b"
+
+    budget_status, budget_color = pacing_status(budget_pacing, expected_pct)
+    revenue_status, revenue_color = pacing_status(revenue_pacing, expected_pct)
+    return {
+        "monthly_budget": monthly_budget,
+        "monthly_revenue": monthly_revenue,
+        "mtd_spend": mtd_spend,
+        "mtd_revenue": mtd_revenue,
+        "budget_pacing_pct": round(budget_pacing, 1),
+        "revenue_pacing_pct": round(revenue_pacing, 1),
+        "expected_pct": round(expected_pct, 1),
+        "days_elapsed": days_elapsed,
+        "days_in_month": days_in_month,
+        "budget_status": budget_status,
+        "budget_color": budget_color,
+        "revenue_status": revenue_status,
+        "revenue_color": revenue_color,
+    }
 
 
 def get_trello_list_id(list_name="To Do"):
@@ -303,7 +317,6 @@ def create_trello_card(list_id, title, description):
 def create_tasks_in_trello(all_results, team):
     todo_list_id = get_trello_list_id("To Do")
     if not todo_list_id:
-        print("Could not find To Do list in Trello")
         return
     date_str = TODAY.strftime("%d %b %Y")
     for result in all_results:
@@ -312,44 +325,33 @@ def create_tasks_in_trello(all_results, team):
         owner_name = next((t["Name"] for t in team if t["Email"] == owner_email), owner_email)
         for insight in result.get("claude_insights", {}).get("insights", []):
             if insight.get("type") in ["fix", "scale"]:
-                title = f"{account_name} — {insight.get('title', 'Action')} | {date_str}"
-                desc = f"**Account:** {account_name}\n**Owner:** {owner_name}\n**Type:** {insight.get('type','').upper()}\n\n{insight.get('text','')}\n\n*Auto-generated {date_str}*"
+                title = f"{account_name} - {insight.get('title', 'Action')} | {date_str}"
+                desc = f"Account: {account_name}\nOwner: {owner_name}\nType: {insight.get('type','').upper()}\n\n{insight.get('text','')}\n\nAuto-generated {date_str}"
                 create_trello_card(todo_list_id, title, desc)
         for alert in result.get("alerts", []):
             if alert["severity"] == "high":
-                title = f"{account_name} — {alert['metric']} Alert | {date_str}"
-                desc = f"**Account:** {account_name}\n**Owner:** {owner_name}\n**Alert:** {alert['message']}\n\n*Auto-generated {date_str}*"
+                title = f"{account_name} - {alert['metric']} Alert | {date_str}"
+                desc = f"Account: {account_name}\nOwner: {owner_name}\nAlert: {alert['message']}\n\nAuto-generated {date_str}"
                 create_trello_card(todo_list_id, title, desc)
 
 
 def generate_quirky_greeting(all_results, thresholds):
-    """Generate a fresh quirky morning greeting based on today's data."""
-    on_track = sum(1 for r in all_results 
-                  if r["summary"].get("last_7d", {}).get("roas", 0) >= 
-                  float(thresholds.get(r["account_name"], {}).get("ROAS Goal", 2.0)))
+    on_track = sum(1 for r in all_results
+                   if r["summary"].get("last_7d", {}).get("roas", 0) >=
+                   float(thresholds.get(r["account_name"], {}).get("ROAS Goal", 2.0)))
     alerts = sum(len(r.get("alerts", [])) for r in all_results)
-    scale_opps = sum(1 for r in all_results 
-                    if r["summary"].get("last_7d", {}).get("roas", 0) >= 
-                    float(thresholds.get(r["account_name"], {}).get("ROAS Goal", 2.0)) * 1.2)
+    scale_opps = sum(1 for r in all_results
+                     if r["summary"].get("last_7d", {}).get("roas", 0) >=
+                     float(thresholds.get(r["account_name"], {}).get("ROAS Goal", 2.0)) * 1.2)
     total = len(all_results)
-    
-    prompt = f"""You are the AI brain behind Carousel Media's daily performance report.
-Write ONE punchy, witty morning greeting line (max 12 words) for the team.
-It should be warm, slightly funny, and reference today's actual performance data.
-Then write ONE short subtitle line (max 10 words) with the key stats.
-
-Today's data:
-- Total accounts: {total}
-- On track: {on_track}
-- Alerts: {alerts}
-- Scale opportunities: {scale_opps}
-
-Rules:
-- First line: witty, warm, no corporate speak. Reference the data cleverly.
-- Second line: plain stats, factual, like "{on_track} green, {alerts} need attention, {scale_opps} ready to scale"
-- Output ONLY valid JSON: {{"greeting": "...", "subtitle": "..."}}
-- No markdown, no explanation"""
-
+    prompt = (
+        f"You are the AI brain behind Carousel Media's daily performance report. "
+        f"Write ONE punchy witty morning greeting line (max 12 words) for the team. "
+        f"Reference today's data cleverly. "
+        f"Today: {total} accounts, {on_track} on track, {alerts} alerts, {scale_opps} scale opportunities. "
+        f"Then write ONE subtitle line (max 10 words) with key stats. "
+        f'Output ONLY valid JSON: {{"greeting": "...", "subtitle": "..."}}'
+    )
     try:
         response = claude.messages.create(
             model="claude-sonnet-4-5",
@@ -362,89 +364,111 @@ Rules:
             if raw.startswith("json"):
                 raw = raw[4:]
         data = json.loads(raw.strip())
-        return data.get("greeting", "Good morning. The pixels worked hard overnight."),                data.get("subtitle", f"{on_track} on track · {alerts} need attention · {scale_opps} ready to scale")
-    except Exception as e:
-        return "Good morning. The pixels worked hard overnight.",                f"{on_track} on track · {alerts} need attention · {scale_opps} ready to scale"
+        return (data.get("greeting", "Good morning. Let us get to work."),
+                data.get("subtitle", f"{on_track} on track · {alerts} alerts · {scale_opps} ready to scale"))
+    except Exception:
+        return ("Good morning. The pixels worked hard overnight.",
+                f"{on_track} on track · {alerts} alerts · {scale_opps} ready to scale")
 
 
-def calculate_pacing(account_name, summary, thresholds):
-    """Calculate monthly budget and revenue pacing."""
+def generate_account_dna(account_name, insights, summary, thresholds):
     thresh = thresholds.get(account_name, {})
-    monthly_budget = float(thresh.get("Monthly Budget Goal", 0))
-    monthly_revenue = float(thresh.get("Monthly Revenue Goal", 0))
-    
-    if monthly_budget == 0 and monthly_revenue == 0:
-        return None
-    
-    # Days elapsed in current month
-    from calendar import monthrange
-    days_in_month = monthrange(TODAY.year, TODAY.month)[1]
-    days_elapsed = TODAY.day
-    pct_month_elapsed = days_elapsed / days_in_month
-    
-    # MTD spend and revenue (using last_30d as proxy, scaled to days)
-    mtd_spend = summary.get("last_30d", {}).get("spend", 0)
-    mtd_revenue = summary.get("last_30d", {}).get("revenue", 0)
-    
-    # Pacing calculations
-    budget_pacing = (mtd_spend / monthly_budget * 100) if monthly_budget > 0 else 0
-    revenue_pacing = (mtd_revenue / monthly_revenue * 100) if monthly_revenue > 0 else 0
-    expected_pct = pct_month_elapsed * 100
-    
-    # Status
-    def pacing_status(actual_pct, expected_pct):
-        if actual_pct >= expected_pct * 1.15:
-            return "overpacing", "#c0392b"
-        elif actual_pct >= expected_pct * 0.85:
-            return "on_pace", "#1a7a4a"
-        else:
-            return "underpacing", "#d68910"
-    
-    budget_status, budget_color = pacing_status(budget_pacing, expected_pct)
-    revenue_status, revenue_color = pacing_status(revenue_pacing, expected_pct)
-    
-    return {
-        "monthly_budget": monthly_budget,
-        "monthly_revenue": monthly_revenue,
-        "mtd_spend": mtd_spend,
-        "mtd_revenue": mtd_revenue,
-        "budget_pacing_pct": round(budget_pacing, 1),
-        "revenue_pacing_pct": round(revenue_pacing, 1),
-        "expected_pct": round(expected_pct, 1),
-        "days_elapsed": days_elapsed,
-        "days_in_month": days_in_month,
-        "budget_status": budget_status,
-        "budget_color": budget_color,
-        "revenue_status": revenue_status,
-        "revenue_color": revenue_color,
-    }
+    l30 = summary.get("last_30d", {})
+    l7 = summary.get("last_7d", {})
+    campaigns_30d = insights.get("last_30d", [])
+    top_campaigns = sorted(campaigns_30d,
+                           key=lambda x: float(x.get("spend", 0)),
+                           reverse=True)[:5]
+    campaign_summary = []
+    for c in top_campaigns:
+        spend = float(c.get("spend", 0))
+        if spend > 0:
+            revenue = extract_revenue(c.get("action_values", []))
+            roas = round(revenue / spend, 2) if spend > 0 else 0
+            campaign_summary.append(
+                f"{c.get('campaign_name', 'Unknown')}: Rs{spend:,.0f} spend, {roas}x ROAS"
+            )
+    prompt = (
+        f"You are analysing a Meta ads account for a performance marketing agency in India. "
+        f"Based on 30-day data, write a concise Account DNA of 5-8 bullet points. "
+        f"Account: {account_name}, ROAS Goal: {thresh.get('ROAS Goal', 2.0)}x, "
+        f"30D: Spend Rs{l30.get('spend',0):,.0f}, ROAS {l30.get('roas',0)}x, "
+        f"CPM Rs{l30.get('cpm',0):,.0f}, CTR {l30.get('ctr',0)}%, "
+        f"7D: ROAS {l7.get('roas',0)}x. "
+        f"Top campaigns: {'; '.join(campaign_summary)}. "
+        f"Cover: best performing products/campaigns, CPM/CPC benchmarks, known patterns, trajectory. "
+        f"Under 200 words. Plain text bullet points starting with -"
+    )
+    try:
+        response = claude.messages.create(
+            model="claude-sonnet-4-5",
+            max_tokens=500,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.content[0].text.strip()
+    except Exception as e:
+        return f"DNA generation failed: {e}"
 
 
-def roas_color(roas, goal):
-    if roas >= goal:
-        return "#1a7a4a"
-    elif roas >= goal * 0.8:
-        return "#d68910"
-    return "#c0392b"
+def generate_weekly_digest(account_name, insights, summary, alerts):
+    l7 = summary.get("last_7d", {})
+    l30 = summary.get("last_30d", {})
+    prompt = (
+        f"Summarise last 7 days of Meta ads for {account_name}. "
+        f"7D: Spend Rs{l7.get('spend',0):,.0f}, ROAS {l7.get('roas',0)}x, "
+        f"CPM Rs{l7.get('cpm',0):,.0f} (30D avg Rs{l30.get('cpm',0):,.0f}), "
+        f"CTR {l7.get('ctr',0)}% (30D avg {l30.get('ctr',0)}%), "
+        f"Purchases {l7.get('purchases',0)}. "
+        f"Alerts: {len(alerts)}. "
+        f"Write 100-150 word digest: what happened, key signals, what was actioned, what to watch. "
+        f"Plain text paragraph, past tense, factual."
+    )
+    try:
+        response = claude.messages.create(
+            model="claude-sonnet-4-5",
+            max_tokens=300,
+            messages=[{"role": "user", "content": prompt}]
+        )
+        return response.content[0].text.strip()
+    except Exception as e:
+        return f"Digest generation failed: {e}"
 
 
-def status_badge(status):
-    badges = {
-        "on_track": ('<span style="background:#e8f5ef;color:#1a7a4a;padding:3px 10px;'
-                     'border-radius:10px;font-size:11px;font-weight:600">On Track</span>'),
-        "watch": ('<span style="background:#fef9e7;color:#d68910;padding:3px 10px;'
-                  'border-radius:10px;font-size:11px;font-weight:600">Watch</span>'),
-        "alert": ('<span style="background:#fdecea;color:#c0392b;padding:3px 10px;'
-                  'border-radius:10px;font-size:11px;font-weight:600">Alert</span>'),
-        "no_data": ('<span style="background:#f0f0f0;color:#888;padding:3px 10px;'
-                    'border-radius:10px;font-size:11px;font-weight:600">No Data</span>'),
-    }
-    return badges.get(status, badges["no_data"])
+def save_to_sheet(account_name, tab_name, col_b, col_c, col_d=None):
+    try:
+        creds = Credentials(
+            token=None,
+            refresh_token=GMAIL_REFRESH_TOKEN,
+            client_id=GMAIL_CLIENT_ID,
+            client_secret=GMAIL_CLIENT_SECRET,
+            token_uri="https://oauth2.googleapis.com/token",
+            scopes=[
+                "https://www.googleapis.com/auth/gmail.send",
+                "https://www.googleapis.com/auth/spreadsheets"
+            ]
+        )
+        creds.refresh(Request())
+        gc = gspread.authorize(creds)
+        sh = gc.open_by_key(SHEETS_ID)
+        ws = sh.worksheet(tab_name)
+        records = ws.get_all_records()
+        for i, r in enumerate(records):
+            if r.get("Account Name") == account_name:
+                row_num = i + 2
+                ws.update(f"B{row_num}", [[col_b]])
+                ws.update(f"C{row_num}", [[col_c]])
+                if col_d:
+                    ws.update(f"D{row_num}", [[col_d]])
+                return
+        row = [account_name, col_b, col_c]
+        if col_d:
+            row.append(col_d)
+        ws.append_row(row)
+    except Exception as e:
+        print(f"   Could not save to {tab_name}: {e}")
 
 
 def build_html_email(all_results, team, thresholds):
-    from html import escape
-
     date_str = TODAY.strftime("%A, %d %B %Y")
     greeting, subtitle = generate_quirky_greeting(all_results, thresholds)
 
@@ -453,10 +477,7 @@ def build_html_email(all_results, team, thresholds):
     TEAL = "#2AB6C9"
     BLACK = "#262626"
     WHITE = "#F3F3F3"
-    CARD_BG = "#FFFFFF"
     BORDER = "#E8E8E8"
-    MUTED = "#8C8C8C"
-    SOFT = "#FAFAFA"
     EMAIL_W = 680
     INNER_W = 620
     CLIENT_CARD_W = 304
@@ -468,23 +489,23 @@ def build_html_email(all_results, team, thresholds):
     TEAM_GAP_W = 14
     TEAM_INNER_W = 264
 
-    def safe(v):
+    def s(v):
         return escape(str(v)) if v is not None else ""
 
     def money(v):
         try:
             v = float(v or 0)
             if v >= 10000000:
-                return f"&#8377;{v/10000000:.2f}Cr"
+                return "Rs" + f"{v/10000000:.2f}Cr"
             if v >= 100000:
-                return f"&#8377;{v/100000:.1f}L"
+                return "Rs" + f"{v/100000:.1f}L"
             if v >= 1000:
-                return f"&#8377;{v/1000:.1f}K"
-            return f"&#8377;{v:,.0f}"
+                return "Rs" + f"{v/1000:.1f}K"
+            return "Rs" + f"{v:,.0f}"
         except Exception:
-            return "&#8377;0"
+            return "Rs0"
 
-    def number(v):
+    def num(v):
         try:
             return f"{int(float(v or 0)):,}"
         except Exception:
@@ -494,22 +515,19 @@ def build_html_email(all_results, team, thresholds):
         try:
             return f"{float(v):.1f}%"
         except Exception:
-            return "0.0%"
+            return "0%"
 
-    def roas_fmt(v):
+    def rfmt(v):
         try:
             return f"{float(v):.2f}x"
         except Exception:
             return "0.00x"
 
-    def clamp_pct(v):
+    def bar_w(v, total):
         try:
-            return max(0, min(float(v), 100))
+            return int(max(0, min(float(v), 100)) / 100 * total)
         except Exception:
             return 0
-
-    def bar_width(v, total_w):
-        return int((clamp_pct(v) / 100) * total_w)
 
     status_map = {
         "on_track": ("On Track", "#E9F8EF", "#15803D"),
@@ -517,7 +535,6 @@ def build_html_email(all_results, team, thresholds):
         "alert": ("Alert", "#FDECEC", "#C0392B"),
         "no_data": ("No Data", "#EEEEEE", "#777777"),
     }
-
     insight_map = {
         "fix": ("FIX IMMEDIATE", "#FDECEC", "#C0392B"),
         "scale": ("SCALE OPPORTUNITY", "#E9F8EF", "#168A43"),
@@ -525,169 +542,178 @@ def build_html_email(all_results, team, thresholds):
         None: ("NOTE", "#F7F7F7", "#999999"),
     }
 
-    def metric_box(label, value, sub="", value_color=BLACK):
-        return f"""<td width="{METRIC_W}" valign="top" style="width:{METRIC_W}px;">
-            <table role="presentation" width="{METRIC_W}" cellpadding="0" cellspacing="0" border="0" style="width:{METRIC_W}px;border-collapse:separate;background:#FFFFFF;border:1px solid {BORDER};border-radius:6px;">
-                <tr><td width="{METRIC_W}" style="width:{METRIC_W}px;padding:10px 10px 9px 10px;font-family:Arial,Helvetica,sans-serif;">
-                    <div style="font-size:9px;line-height:12px;letter-spacing:.7px;text-transform:uppercase;color:#A5A5A5;font-weight:800;">{safe(label)}</div>
-                    <div style="font-size:18px;line-height:22px;color:{value_color};font-weight:900;margin-top:5px;">{safe(value)}</div>
-                    <div style="font-size:10px;line-height:13px;color:#777777;font-weight:700;margin-top:2px;">{safe(sub)}</div>
-                </td></tr>
-            </table>
-        </td>"""
+    def metric_box(label, value, sub="", vc=BLACK):
+        return (
+            '<td width="' + str(METRIC_W) + '" valign="top" style="width:' + str(METRIC_W) + 'px;">'
+            '<table role="presentation" width="' + str(METRIC_W) + '" cellpadding="0" cellspacing="0" border="0" '
+            'style="width:' + str(METRIC_W) + 'px;border-collapse:separate;background:#FFFFFF;border:1px solid ' + BORDER + ';border-radius:6px;">'
+            '<tr><td style="padding:10px;font-family:Arial,Helvetica,sans-serif;">'
+            '<div style="font-size:9px;text-transform:uppercase;color:#A5A5A5;font-weight:800;letter-spacing:.7px;">' + s(label) + '</div>'
+            '<div style="font-size:18px;color:' + vc + ';font-weight:900;margin-top:5px;">' + s(value) + '</div>'
+            '<div style="font-size:10px;color:#777;font-weight:700;margin-top:2px;">' + s(sub) + '</div>'
+            '</td></tr></table></td>'
+        )
 
-    def pacing_block(label, pacing_pct, expected_pct, color):
-        BAR_W = 124
-        fill = bar_width(pacing_pct, BAR_W)
-        empty = BAR_W - fill
-        return f"""<td width="{METRIC_W}" valign="top" style="width:{METRIC_W}px;font-family:Arial,Helvetica,sans-serif;">
-            <div style="font-size:10px;line-height:13px;color:#777777;font-weight:700;margin-bottom:4px;">{safe(label)}</div>
-            <table role="presentation" width="{BAR_W}" cellpadding="0" cellspacing="0" border="0" style="width:{BAR_W}px;border-collapse:collapse;background:#EFEFEF;">
-                <tr>
-                    <td width="{fill}" height="5" style="width:{fill}px;height:5px;background:{safe(color)};font-size:0;line-height:0;">&nbsp;</td>
-                    <td width="{empty}" height="5" style="width:{empty}px;height:5px;background:#EFEFEF;font-size:0;line-height:0;">&nbsp;</td>
-                </tr>
-            </table>
-            <div style="font-size:10px;line-height:13px;color:{safe(color)};font-weight:900;margin-top:4px;">{pct(pacing_pct)} <span style="color:#999999;font-weight:500;">exp. {pct(expected_pct)}</span></div>
-        </td>"""
+    def pacing_block(label, pp, ep, color):
+        BAR = 124
+        fill = bar_w(pp, BAR)
+        empty = BAR - fill
+        return (
+            '<td width="' + str(METRIC_W) + '" valign="top" style="width:' + str(METRIC_W) + 'px;font-family:Arial,Helvetica,sans-serif;">'
+            '<div style="font-size:10px;color:#777;font-weight:700;margin-bottom:4px;">' + s(label) + '</div>'
+            '<table role="presentation" width="' + str(BAR) + '" cellpadding="0" cellspacing="0" border="0" '
+            'style="width:' + str(BAR) + 'px;border-collapse:collapse;background:#EFEFEF;">'
+            '<tr>'
+            '<td width="' + str(fill) + '" height="5" style="width:' + str(fill) + 'px;height:5px;background:' + s(color) + ';font-size:0;">&nbsp;</td>'
+            '<td width="' + str(empty) + '" height="5" style="width:' + str(empty) + 'px;height:5px;background:#EFEFEF;font-size:0;">&nbsp;</td>'
+            '</tr></table>'
+            '<div style="font-size:10px;color:' + s(color) + ';font-weight:900;margin-top:4px;">' + pct(pp) +
+            ' <span style="color:#999;font-weight:500;">exp. ' + pct(ep) + '</span></div>'
+            '</td>'
+        )
 
-    def account_card(account):
-        status = account.get("status", "no_data")
-        status_label, status_bg, status_color = status_map.get(status, status_map["no_data"])
-        insight_type = account.get("insight_type")
-        insight_label, insight_bg, insight_color = insight_map.get(insight_type, insight_map[None])
-        pacing = account.get("pacing") or {}
+    def account_card(acct):
+        st = acct.get("status", "no_data")
+        sl, sbg, sc = status_map.get(st, status_map["no_data"])
+        it = acct.get("insight_type")
+        il, ibg, ic = insight_map.get(it, insight_map[None])
+        p = acct.get("pacing") or {}
         try:
-            roas_color = "#168A43" if float(account.get("roas_7d", 0)) >= float(account.get("roas_goal", 0)) else "#C0392B"
+            rc = "#168A43" if float(acct.get("roas_7d", 0)) >= float(acct.get("roas_goal", 0)) else "#C0392B"
         except Exception:
-            roas_color = BLACK
-        insight_text = account.get("insight_text") or "No critical action needed today."
+            rc = BLACK
+        itxt = acct.get("insight_text") or "No critical action needed today."
 
-        return f"""<table role="presentation" width="{CLIENT_CARD_W}" cellpadding="0" cellspacing="0" border="0" style="width:{CLIENT_CARD_W}px;border-collapse:separate;background:{CARD_BG};border:1px solid {BORDER};border-radius:8px;">
-            <tr><td width="{CLIENT_CARD_W}" style="width:{CLIENT_CARD_W}px;background:{ORANGE};border-radius:8px 8px 0 0;padding:14px 14px 13px 14px;font-family:Arial,Helvetica,sans-serif;">
-                <table role="presentation" width="276" cellpadding="0" cellspacing="0" border="0" style="width:276px;border-collapse:collapse;">
-                    <tr>
-                        <td width="195" valign="middle" style="width:195px;">
-                            <div style="font-size:14px;line-height:18px;color:#FFFFFF;font-weight:900;">{safe(account.get("account_name"))}</div>
-                            <div style="font-size:10px;line-height:14px;color:#FFE0CF;font-weight:700;">{safe(account.get("owner_name"))} &middot; Meta</div>
-                        </td>
-                        <td width="81" align="right" valign="middle" style="width:81px;">
-                            <span style="display:inline-block;background:{status_bg};color:{status_color};font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:900;padding:4px 9px;border-radius:14px;">{safe(status_label)}</span>
-                        </td>
-                    </tr>
-                </table>
-            </td></tr>
-            <tr><td width="{CLIENT_CARD_W}" style="width:{CLIENT_CARD_W}px;padding:14px 14px 12px 14px;background:#FFFFFF;">
-                <table role="presentation" width="{CLIENT_INNER_W}" cellpadding="0" cellspacing="0" border="0" style="width:{CLIENT_INNER_W}px;border-collapse:collapse;">
-                    <tr>
-                        {metric_box("ROAS (7D)", roas_fmt(account.get("roas_7d",0)), f"vs {roas_fmt(account.get('roas_goal',0))} goal", roas_color)}
-                        <td width="{METRIC_GAP_W}" style="width:{METRIC_GAP_W}px;font-size:0;">&nbsp;</td>
-                        {metric_box("Revenue (7D)", money(account.get("revenue_7d",0)), f"Yesterday {money(account.get('revenue_yesterday',0))}")}
-                    </tr>
-                    <tr><td colspan="3" height="8" style="height:8px;font-size:0;">&nbsp;</td></tr>
-                    <tr>
-                        {metric_box("Spend (7D)", money(account.get("spend_7d",0)), f"CTR {pct(account.get('ctr_7d',0))}")}
-                        <td width="{METRIC_GAP_W}" style="width:{METRIC_GAP_W}px;font-size:0;">&nbsp;</td>
-                        {metric_box("Purchases", number(account.get("purchases_7d",0)), f"CPC &#8377;{safe(account.get('cpc_7d',0))}")}
-                    </tr>
-                </table>
-            </td></tr>
-            <tr><td width="{CLIENT_CARD_W}" style="width:{CLIENT_CARD_W}px;padding:11px 14px 13px 14px;background:#FAFAFA;border-top:1px solid #EEEEEE;font-family:Arial,Helvetica,sans-serif;">
-                <div style="font-size:10px;color:#A1A1A1;font-weight:900;text-transform:uppercase;letter-spacing:.9px;margin-bottom:9px;">June Pacing &mdash; Day {safe(pacing.get("days_elapsed",""))} of {safe(pacing.get("days_in_month",""))}</div>
-                <table role="presentation" width="{CLIENT_INNER_W}" cellpadding="0" cellspacing="0" border="0" style="width:{CLIENT_INNER_W}px;border-collapse:collapse;">
-                    <tr>
-                        {pacing_block("Budget", pacing.get("budget_pacing_pct",0), pacing.get("expected_pct",0), pacing.get("budget_color", ORANGE))}
-                        <td width="{METRIC_GAP_W}" style="width:{METRIC_GAP_W}px;font-size:0;">&nbsp;</td>
-                        {pacing_block("Revenue", pacing.get("revenue_pacing_pct",0), pacing.get("expected_pct",0), pacing.get("revenue_color", ORANGE))}
-                    </tr>
-                </table>
-            </td></tr>
-            <tr><td width="{CLIENT_CARD_W}" style="width:{CLIENT_CARD_W}px;padding:0;background:#FFFFFF;border-radius:0 0 8px 8px;">
-                <table role="presentation" width="{CLIENT_CARD_W}" cellpadding="0" cellspacing="0" border="0" style="width:{CLIENT_CARD_W}px;border-collapse:collapse;background:{insight_bg};border-radius:0 0 8px 8px;">
-                    <tr>
-                        <td width="4" style="width:4px;background:{insight_color};font-size:0;">&nbsp;</td>
-                        <td style="padding:12px 14px 13px 14px;font-family:Arial,Helvetica,sans-serif;">
-                            <div style="font-size:10px;color:{insight_color};font-weight:900;text-transform:uppercase;letter-spacing:.8px;">{safe(insight_label)}</div>
-                            <div style="font-size:11px;color:{BLACK};font-weight:500;margin-top:5px;line-height:16px;">{safe(insight_text)}</div>
-                        </td>
-                    </tr>
-                </table>
-            </td></tr>
-        </table>"""
+        pacing_html = ""
+        if p:
+            pacing_html = (
+                '<tr><td style="padding:11px 14px 13px 14px;background:#FAFAFA;border-top:1px solid #EEE;font-family:Arial,Helvetica,sans-serif;">'
+                '<div style="font-size:10px;color:#A1A1A1;font-weight:900;text-transform:uppercase;letter-spacing:.9px;margin-bottom:9px;">'
+                'June Pacing &mdash; Day ' + s(p.get("days_elapsed","")) + ' of ' + s(p.get("days_in_month","")) + '</div>'
+                '<table role="presentation" width="' + str(CLIENT_INNER_W) + '" cellpadding="0" cellspacing="0" border="0" '
+                'style="width:' + str(CLIENT_INNER_W) + 'px;border-collapse:collapse;"><tr>'
+                + pacing_block("Budget", p.get("budget_pacing_pct",0), p.get("expected_pct",0), p.get("budget_color", ORANGE))
+                + '<td width="' + str(METRIC_GAP_W) + '" style="width:' + str(METRIC_GAP_W) + 'px;font-size:0;">&nbsp;</td>'
+                + pacing_block("Revenue", p.get("revenue_pacing_pct",0), p.get("expected_pct",0), p.get("revenue_color", ORANGE))
+                + '</tr></table></td></tr>'
+            )
 
-    def account_rows(accounts_list):
+        return (
+            '<table role="presentation" width="' + str(CLIENT_CARD_W) + '" cellpadding="0" cellspacing="0" border="0" '
+            'style="width:' + str(CLIENT_CARD_W) + 'px;border-collapse:separate;background:#FFFFFF;border:1px solid ' + BORDER + ';border-radius:8px;">'
+            '<tr><td style="background:' + ORANGE + ';border-radius:8px 8px 0 0;padding:14px;">'
+            '<table role="presentation" width="276" cellpadding="0" cellspacing="0" border="0" style="width:276px;border-collapse:collapse;">'
+            '<tr>'
+            '<td width="195" style="width:195px;">'
+            '<div style="font-size:14px;color:#FFF;font-weight:900;font-family:Arial,Helvetica,sans-serif;">' + s(acct.get("account_name")) + '</div>'
+            '<div style="font-size:10px;color:#FFE0CF;font-weight:700;font-family:Arial,Helvetica,sans-serif;">' + s(acct.get("owner_name")) + ' &middot; Meta</div>'
+            '</td>'
+            '<td width="81" align="right" style="width:81px;">'
+            '<span style="display:inline-block;background:' + sbg + ';color:' + sc + ';font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:900;padding:4px 9px;border-radius:14px;">' + s(sl) + '</span>'
+            '</td>'
+            '</tr></table></td></tr>'
+            '<tr><td style="padding:14px;background:#FFFFFF;">'
+            '<table role="presentation" width="' + str(CLIENT_INNER_W) + '" cellpadding="0" cellspacing="0" border="0" style="width:' + str(CLIENT_INNER_W) + 'px;border-collapse:collapse;">'
+            '<tr>'
+            + metric_box("ROAS (7D)", rfmt(acct.get("roas_7d",0)), "vs " + rfmt(acct.get("roas_goal",0)) + " goal", rc)
+            + '<td width="' + str(METRIC_GAP_W) + '" style="width:' + str(METRIC_GAP_W) + 'px;font-size:0;">&nbsp;</td>'
+            + metric_box("Revenue (7D)", money(acct.get("revenue_7d",0)), "Yesterday " + money(acct.get("revenue_yesterday",0)))
+            + '</tr><tr><td colspan="3" height="8" style="height:8px;font-size:0;">&nbsp;</td></tr><tr>'
+            + metric_box("Spend (7D)", money(acct.get("spend_7d",0)), "CTR " + pct(acct.get("ctr_7d",0)))
+            + '<td width="' + str(METRIC_GAP_W) + '" style="width:' + str(METRIC_GAP_W) + 'px;font-size:0;">&nbsp;</td>'
+            + metric_box("Purchases", num(acct.get("purchases_7d",0)), "CPC Rs" + s(acct.get("cpc_7d",0)))
+            + '</tr></table></td></tr>'
+            + pacing_html
+            + '<tr><td style="padding:0;border-radius:0 0 8px 8px;">'
+            '<table role="presentation" width="' + str(CLIENT_CARD_W) + '" cellpadding="0" cellspacing="0" border="0" '
+            'style="width:' + str(CLIENT_CARD_W) + 'px;border-collapse:collapse;background:' + ibg + ';border-radius:0 0 8px 8px;">'
+            '<tr>'
+            '<td width="4" style="width:4px;background:' + ic + ';font-size:0;">&nbsp;</td>'
+            '<td style="padding:12px 14px;font-family:Arial,Helvetica,sans-serif;">'
+            '<div style="font-size:10px;color:' + ic + ';font-weight:900;text-transform:uppercase;letter-spacing:.8px;">' + s(il) + '</div>'
+            '<div style="font-size:11px;color:' + BLACK + ';font-weight:500;margin-top:5px;line-height:16px;">' + s(itxt) + '</div>'
+            '</td></tr></table></td></tr></table>'
+        )
+
+    def account_rows(accts):
         rows = []
-        for i in range(0, len(accounts_list), 2):
-            left = account_card(accounts_list[i])
-            right = account_card(accounts_list[i+1]) if i+1 < len(accounts_list) else ""
-            rows.append(f"""<tr>
-                <td width="{CLIENT_CARD_W}" valign="top" style="width:{CLIENT_CARD_W}px;">{left}</td>
-                <td width="{CLIENT_GAP_W}" style="width:{CLIENT_GAP_W}px;font-size:0;">&nbsp;</td>
-                <td width="{CLIENT_CARD_W}" valign="top" style="width:{CLIENT_CARD_W}px;">{right}</td>
-            </tr>
-            <tr><td colspan="3" height="14" style="height:14px;font-size:0;">&nbsp;</td></tr>""")
+        for i in range(0, len(accts), 2):
+            left = account_card(accts[i])
+            right = account_card(accts[i+1]) if i+1 < len(accts) else ""
+            rows.append(
+                '<tr>'
+                '<td width="' + str(CLIENT_CARD_W) + '" valign="top" style="width:' + str(CLIENT_CARD_W) + 'px;">' + left + '</td>'
+                '<td width="' + str(CLIENT_GAP_W) + '" style="width:' + str(CLIENT_GAP_W) + 'px;font-size:0;">&nbsp;</td>'
+                '<td width="' + str(CLIENT_CARD_W) + '" valign="top" style="width:' + str(CLIENT_CARD_W) + 'px;">' + right + '</td>'
+                '</tr>'
+                '<tr><td colspan="3" height="14" style="height:14px;font-size:0;">&nbsp;</td></tr>'
+            )
         return "".join(rows)
 
     def task_row(task):
-        return f"""<tr>
-            <td width="16" valign="top" style="width:16px;padding:8px 0;">
-                <table role="presentation" width="7" cellpadding="0" cellspacing="0" border="0" style="width:7px;border-collapse:collapse;">
-                    <tr><td width="7" height="7" style="width:7px;height:7px;background:{safe(task.get("color",ORANGE))};border-radius:7px;font-size:0;">&nbsp;</td></tr>
-                </table>
-            </td>
-            <td width="74" valign="top" style="width:74px;padding:6px 6px 6px 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:{BLACK};font-weight:900;">{safe(task.get("account"))}</td>
-            <td width="124" valign="top" style="width:124px;padding:6px 6px 6px 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#555555;">{safe(task.get("action"))}</td>
-            <td width="40" align="right" valign="top" style="width:40px;padding:6px 0;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:{ORANGE};font-weight:900;">{safe(task.get("deadline"))}</td>
-        </tr>"""
+        return (
+            '<tr>'
+            '<td width="16" valign="top" style="width:16px;padding:8px 0;">'
+            '<table role="presentation" width="7" cellpadding="0" cellspacing="0" border="0" style="width:7px;border-collapse:collapse;">'
+            '<tr><td width="7" height="7" style="width:7px;height:7px;background:' + s(task.get("color", ORANGE)) + ';border-radius:7px;font-size:0;">&nbsp;</td></tr>'
+            '</table></td>'
+            '<td width="74" valign="top" style="width:74px;padding:6px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:' + BLACK + ';font-weight:900;">' + s(task.get("account")) + '</td>'
+            '<td width="124" valign="top" style="width:124px;padding:6px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#555;">' + s(task.get("action")) + '</td>'
+            '<td width="40" align="right" valign="top" style="width:40px;padding:6px 0;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:' + ORANGE + ';font-weight:900;">' + s(task.get("deadline")) + '</td>'
+            '</tr>'
+        )
 
     def team_card(member):
         tasks = member.get("tasks") or []
         if tasks:
             task_html = "".join(task_row(t) for t in tasks)
-            body = f"""<tr><td style="padding:10px 14px 14px 14px;">
-                <table role="presentation" width="{TEAM_INNER_W}" cellpadding="0" cellspacing="0" border="0" style="width:{TEAM_INNER_W}px;border-collapse:collapse;">{task_html}</table>
-            </td></tr>"""
+            body = (
+                '<tr><td style="padding:10px 14px 14px 14px;">'
+                '<table role="presentation" width="' + str(TEAM_INNER_W) + '" cellpadding="0" cellspacing="0" border="0" style="width:' + str(TEAM_INNER_W) + 'px;border-collapse:collapse;">'
+                + task_html + '</table></td></tr>'
+            )
         else:
-            body = f"""<tr><td style="padding:18px 14px 22px 14px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999999;font-style:italic;">All good &mdash; no action needed today.</td></tr>"""
+            body = '<tr><td style="padding:18px 14px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999;font-style:italic;">All good &mdash; no action needed today.</td></tr>'
 
-        return f"""<table role="presentation" width="{TEAM_CARD_W}" cellpadding="0" cellspacing="0" border="0" style="width:{TEAM_CARD_W}px;border-collapse:separate;background:#FFFFFF;border:1px solid {BORDER};border-radius:8px;">
-            <tr><td width="{TEAM_CARD_W}" style="width:{TEAM_CARD_W}px;background:{NAVY};border-radius:8px 8px 0 0;padding:13px 14px;font-family:Arial,Helvetica,sans-serif;">
-                <table role="presentation" width="{TEAM_INNER_W}" cellpadding="0" cellspacing="0" border="0" style="width:{TEAM_INNER_W}px;border-collapse:collapse;">
-                    <tr>
-                        <td width="42" valign="middle" style="width:42px;">
-                            <table role="presentation" width="32" cellpadding="0" cellspacing="0" border="0" style="width:32px;border-collapse:collapse;">
-                                <tr><td width="32" height="32" align="center" valign="middle" style="width:32px;height:32px;background:{ORANGE};border-radius:32px;font-family:Arial,Helvetica,sans-serif;color:#FFFFFF;font-size:11px;line-height:32px;font-weight:900;">{safe(member.get("initials"))}</td></tr>
-                            </table>
-                        </td>
-                        <td width="222" valign="middle" style="width:222px;padding-left:8px;">
-                            <div style="font-size:14px;color:#FFFFFF;font-weight:900;">{safe(member.get("name"))}</div>
-                            <div style="font-size:10px;color:{TEAL};font-weight:700;margin-top:2px;">{safe(member.get("role"))}</div>
-                        </td>
-                    </tr>
-                </table>
-            </td></tr>
-            {body}
-        </table>"""
+        return (
+            '<table role="presentation" width="' + str(TEAM_CARD_W) + '" cellpadding="0" cellspacing="0" border="0" '
+            'style="width:' + str(TEAM_CARD_W) + 'px;border-collapse:separate;background:#FFFFFF;border:1px solid ' + BORDER + ';border-radius:8px;">'
+            '<tr><td style="background:' + NAVY + ';border-radius:8px 8px 0 0;padding:13px 14px;">'
+            '<table role="presentation" width="' + str(TEAM_INNER_W) + '" cellpadding="0" cellspacing="0" border="0" style="width:' + str(TEAM_INNER_W) + 'px;border-collapse:collapse;">'
+            '<tr>'
+            '<td width="42" valign="middle" style="width:42px;">'
+            '<table role="presentation" width="32" cellpadding="0" cellspacing="0" border="0" style="width:32px;border-collapse:collapse;">'
+            '<tr><td width="32" height="32" align="center" valign="middle" '
+            'style="width:32px;height:32px;background:' + ORANGE + ';border-radius:32px;font-family:Arial,Helvetica,sans-serif;color:#FFF;font-size:11px;line-height:32px;font-weight:900;">'
+            + s(member.get("initials")) + '</td></tr></table></td>'
+            '<td valign="middle" style="padding-left:8px;">'
+            '<div style="font-size:14px;color:#FFF;font-weight:900;font-family:Arial,Helvetica,sans-serif;">' + s(member.get("name")) + '</div>'
+            '<div style="font-size:10px;color:' + TEAL + ';font-weight:700;font-family:Arial,Helvetica,sans-serif;margin-top:2px;">' + s(member.get("role")) + '</div>'
+            '</td></tr></table></td></tr>'
+            + body + '</table>'
+        )
 
-    def team_rows(team_list):
+    def team_rows(members):
         rows = []
-        for i in range(0, len(team_list), 2):
-            left = team_card(team_list[i])
-            right = team_card(team_list[i+1]) if i+1 < len(team_list) else ""
-            rows.append(f"""<tr>
-                <td width="{TEAM_CARD_W}" valign="top" style="width:{TEAM_CARD_W}px;">{left}</td>
-                <td width="{TEAM_GAP_W}" style="width:{TEAM_GAP_W}px;font-size:0;">&nbsp;</td>
-                <td width="{TEAM_CARD_W}" valign="top" style="width:{TEAM_CARD_W}px;">{right}</td>
-            </tr>
-            <tr><td colspan="3" height="14" style="height:14px;font-size:0;">&nbsp;</td></tr>""")
+        for i in range(0, len(members), 2):
+            left = team_card(members[i])
+            right = team_card(members[i+1]) if i+1 < len(members) else ""
+            rows.append(
+                '<tr>'
+                '<td width="' + str(TEAM_CARD_W) + '" valign="top" style="width:' + str(TEAM_CARD_W) + 'px;">' + left + '</td>'
+                '<td width="' + str(TEAM_GAP_W) + '" style="width:' + str(TEAM_GAP_W) + 'px;font-size:0;">&nbsp;</td>'
+                '<td width="' + str(TEAM_CARD_W) + '" valign="top" style="width:' + str(TEAM_CARD_W) + 'px;">' + right + '</td>'
+                '</tr>'
+                '<tr><td colspan="3" height="14" style="height:14px;font-size:0;">&nbsp;</td></tr>'
+            )
         return "".join(rows)
 
-    # Build accounts and team data
+    # Build data
     accounts = []
     tasks_by_owner = {}
 
     for result in all_results:
-        s = result["summary"]
+        s_data = result["summary"]
         account = result["account"]
         account_name = result["account_name"]
         thresh = thresholds.get(account_name, {})
@@ -695,8 +721,8 @@ def build_html_email(all_results, team, thresholds):
         owner_email = account.get("Owner", "")
         owner_name = next((t["Name"] for t in team if t["Email"] == owner_email), owner_email)
 
-        y = s.get("yesterday", {})
-        l7 = s.get("last_7d", {})
+        y = s_data.get("yesterday", {})
+        l7 = s_data.get("last_7d", {})
         roas_7d = l7.get("roas", 0)
 
         if l7.get("spend", 0) == 0:
@@ -718,10 +744,10 @@ def build_html_email(all_results, team, thresholds):
             insight_type = "fix"
             insight_text = alerts_list[0]["message"]
         elif insights:
-            top = next((i for i in insights if i.get("type") in ["fix","scale","watch"]), None)
+            top = next((i for i in insights if i.get("type") in ["fix", "scale", "watch"]), None)
             if top:
                 insight_type = top.get("type")
-                insight_text = top.get("text","")[:200]
+                insight_text = top.get("text", "")[:200]
 
         accounts.append({
             "account_name": account_name,
@@ -742,9 +768,12 @@ def build_html_email(all_results, team, thresholds):
         })
 
         if owner_email not in tasks_by_owner:
-            role = next((t.get("Role","") for t in team if t["Email"] == owner_email), "")
+            role = next((t.get("Role", "") for t in team if t["Email"] == owner_email), "")
             initials = "".join([n[0].upper() for n in owner_name.split()[:2]])
-            tasks_by_owner[owner_email] = {"name": owner_name, "initials": initials, "role": role, "tasks": []}
+            tasks_by_owner[owner_email] = {
+                "name": owner_name, "initials": initials,
+                "role": role, "tasks": []
+            }
 
         if alerts_list:
             top = alerts_list[0]
@@ -755,11 +784,11 @@ def build_html_email(all_results, team, thresholds):
                 "color": "#C0392B" if top["severity"] == "high" else "#D66A16"
             })
         elif insights:
-            top_ins = next((i for i in insights if i.get("type") in ["fix","scale"]), None)
+            top_ins = next((i for i in insights if i.get("type") in ["fix", "scale"]), None)
             if top_ins:
                 tasks_by_owner[owner_email]["tasks"].append({
                     "account": account_name[:12],
-                    "action": top_ins.get("text","")[:90],
+                    "action": top_ins.get("text", "")[:90],
                     "deadline": "EOD",
                     "color": "#C0392B" if top_ins.get("type") == "fix" else "#168A43"
                 })
@@ -769,7 +798,7 @@ def build_html_email(all_results, team, thresholds):
             tasks_by_owner[t["Email"]] = {
                 "name": t["Name"],
                 "initials": "".join([n[0].upper() for n in t["Name"].split()[:2]]),
-                "role": t.get("Role",""),
+                "role": t.get("Role", ""),
                 "tasks": []
             }
 
@@ -777,73 +806,72 @@ def build_html_email(all_results, team, thresholds):
     clients_html = account_rows(accounts)
     team_html_str = team_rows(team_list)
 
-    return f"""<!doctype html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <meta name="x-apple-disable-message-reformatting">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Carousel Media Daily Report</title>
-</head>
-<body style="margin:0;padding:0;background:{WHITE};font-family:Arial,Helvetica,sans-serif;">
-<center style="width:100%;background:{WHITE};">
-<table role="presentation" width="{EMAIL_W}" cellpadding="0" cellspacing="0" border="0" style="width:{EMAIL_W}px;border-collapse:collapse;background:{WHITE};">
-<tr><td style="padding:14px 20px 0 20px;">
-<table role="presentation" width="{INNER_W}" cellpadding="0" cellspacing="0" border="0" style="width:{INNER_W}px;border-collapse:collapse;background:{NAVY};border-radius:10px 10px 0 0;">
-<tr>
-    <td width="360" valign="middle" style="width:360px;padding:24px 28px;font-family:Arial,Helvetica,sans-serif;">
-        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">
-            <tr>
-                <td width="58" valign="middle" style="width:58px;">
-                    <table role="presentation" width="42" cellpadding="0" cellspacing="0" border="0" style="width:42px;border-collapse:collapse;">
-                        <tr><td width="42" height="42" align="center" valign="middle" style="width:42px;height:42px;background:{ORANGE};border-radius:8px;font-family:Arial,Helvetica,sans-serif;color:#FFFFFF;font-size:23px;line-height:42px;font-weight:900;">C</td></tr>
-                    </table>
-                </td>
-                <td valign="middle" style="padding-left:10px;">
-                    <div style="font-size:21px;line-height:25px;color:#FFFFFF;font-weight:900;letter-spacing:.4px;">CAROUSEL MEDIA</div>
-                    <div style="font-size:11px;line-height:15px;color:{TEAL};font-weight:900;letter-spacing:1.1px;text-transform:uppercase;margin-top:3px;">Daily Performance Report</div>
-                </td>
-            </tr>
-        </table>
-    </td>
-    <td width="260" align="right" valign="middle" style="width:260px;padding:24px 28px;font-family:Arial,Helvetica,sans-serif;">
-        <div style="font-size:14px;color:#FFFFFF;font-weight:900;">{date_str}</div>
-        <div style="font-size:11px;color:{TEAL};font-weight:700;margin-top:6px;">Generated 8:00 AM IST</div>
-    </td>
-</tr>
-</table>
-<table role="presentation" width="{INNER_W}" cellpadding="0" cellspacing="0" border="0" style="width:{INNER_W}px;border-collapse:collapse;background:{ORANGE};">
-<tr><td align="center" style="padding:16px 30px 15px 30px;font-family:Arial,Helvetica,sans-serif;">
-    <div style="font-size:15px;color:#FFFFFF;font-weight:900;">{greeting}</div>
-    <div style="font-size:12px;color:#FFE2D1;font-weight:800;margin-top:4px;">{subtitle}</div>
-</td></tr>
-</table>
-<table role="presentation" width="{INNER_W}" cellpadding="0" cellspacing="0" border="0" style="width:{INNER_W}px;border-collapse:collapse;background:#FFFFFF;">
-<tr><td style="padding:22px 28px 12px 28px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999999;font-weight:900;text-transform:uppercase;letter-spacing:1.6px;">Client Snapshots</td></tr>
-<tr><td style="padding:0 28px 4px 28px;">
-    <table role="presentation" width="{INNER_W - 56}" cellpadding="0" cellspacing="0" border="0" style="width:{INNER_W - 56}px;border-collapse:collapse;">
-        {clients_html}
-    </table>
-</td></tr>
-<tr><td style="padding:18px 28px 12px 28px;border-top:1px solid #EEEEEE;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999999;font-weight:900;text-transform:uppercase;letter-spacing:1.6px;">Today's War Room</td></tr>
-<tr><td style="padding:0 28px 8px 28px;">
-    <table role="presentation" width="{INNER_W - 56}" cellpadding="0" cellspacing="0" border="0" style="width:{INNER_W - 56}px;border-collapse:collapse;">
-        {team_html_str}
-    </table>
-</td></tr>
-</table>
-<table role="presentation" width="{INNER_W}" cellpadding="0" cellspacing="0" border="0" style="width:{INNER_W}px;border-collapse:collapse;background:{NAVY};border-radius:0 0 10px 10px;">
-<tr>
-    <td width="310" style="width:310px;padding:15px 28px;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:{TEAL};">carouselmedia.in &middot; Tasks synced to Trello</td>
-    <td width="310" align="right" style="width:310px;padding:15px 28px;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#A9C7D3;">Powered by Claude AI</td>
-</tr>
-</table>
-</td></tr>
-<tr><td height="26" style="height:26px;font-size:0;">&nbsp;</td></tr>
-</table>
-</center>
-</body>
-</html>
+    IW = str(INNER_W - 56)
+
+    return (
+        '<!doctype html><html><head>'
+        '<meta charset="utf-8">'
+        '<meta name="x-apple-disable-message-reformatting">'
+        '<meta name="viewport" content="width=device-width,initial-scale=1">'
+        '<title>Carousel Media Daily Report</title>'
+        '</head>'
+        '<body style="margin:0;padding:0;background:' + WHITE + ';font-family:Arial,Helvetica,sans-serif;">'
+        '<center style="width:100%;background:' + WHITE + ';">'
+        '<table role="presentation" width="' + str(EMAIL_W) + '" cellpadding="0" cellspacing="0" border="0" '
+        'style="width:' + str(EMAIL_W) + 'px;border-collapse:collapse;background:' + WHITE + ';">'
+        '<tr><td style="padding:14px 20px 0 20px;">'
+
+        '<table role="presentation" width="' + str(INNER_W) + '" cellpadding="0" cellspacing="0" border="0" '
+        'style="width:' + str(INNER_W) + 'px;border-collapse:collapse;background:' + NAVY + ';border-radius:10px 10px 0 0;">'
+        '<tr>'
+        '<td width="360" valign="middle" style="width:360px;padding:24px 28px;font-family:Arial,Helvetica,sans-serif;">'
+        '<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">'
+        '<tr>'
+        '<td width="58" valign="middle" style="width:58px;">'
+        '<table role="presentation" width="42" cellpadding="0" cellspacing="0" border="0" style="width:42px;border-collapse:collapse;">'
+        '<tr><td width="42" height="42" align="center" valign="middle" '
+        'style="width:42px;height:42px;background:' + ORANGE + ';border-radius:8px;font-family:Arial,Helvetica,sans-serif;color:#FFF;font-size:23px;line-height:42px;font-weight:900;">C</td></tr>'
+        '</table></td>'
+        '<td valign="middle" style="padding-left:10px;">'
+        '<div style="font-size:21px;color:#FFF;font-weight:900;letter-spacing:.4px;">CAROUSEL MEDIA</div>'
+        '<div style="font-size:11px;color:' + TEAL + ';font-weight:900;letter-spacing:1.1px;text-transform:uppercase;margin-top:3px;">Daily Performance Report</div>'
+        '</td></tr></table></td>'
+        '<td width="260" align="right" valign="middle" style="width:260px;padding:24px 28px;font-family:Arial,Helvetica,sans-serif;">'
+        '<div style="font-size:14px;color:#FFF;font-weight:900;">' + escape(date_str) + '</div>'
+        '<div style="font-size:11px;color:' + TEAL + ';font-weight:700;margin-top:6px;">Generated 8:00 AM IST</div>'
+        '</td></tr></table>'
+
+        '<table role="presentation" width="' + str(INNER_W) + '" cellpadding="0" cellspacing="0" border="0" '
+        'style="width:' + str(INNER_W) + 'px;border-collapse:collapse;background:' + ORANGE + ';">'
+        '<tr><td align="center" style="padding:16px 30px 15px 30px;font-family:Arial,Helvetica,sans-serif;">'
+        '<div style="font-size:15px;color:#FFF;font-weight:900;">' + escape(greeting) + '</div>'
+        '<div style="font-size:12px;color:#FFE2D1;font-weight:800;margin-top:4px;">' + escape(subtitle) + '</div>'
+        '</td></tr></table>'
+
+        '<table role="presentation" width="' + str(INNER_W) + '" cellpadding="0" cellspacing="0" border="0" '
+        'style="width:' + str(INNER_W) + 'px;border-collapse:collapse;background:#FFFFFF;">'
+        '<tr><td style="padding:22px 28px 12px 28px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999;font-weight:900;text-transform:uppercase;letter-spacing:1.6px;">Client Snapshots</td></tr>'
+        '<tr><td style="padding:0 28px 4px 28px;">'
+        '<table role="presentation" width="' + IW + '" cellpadding="0" cellspacing="0" border="0" style="width:' + IW + 'px;border-collapse:collapse;">'
+        + clients_html +
+        '</table></td></tr>'
+        '<tr><td style="padding:18px 28px 12px 28px;border-top:1px solid #EEE;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999;font-weight:900;text-transform:uppercase;letter-spacing:1.6px;">Today\'s War Room</td></tr>'
+        '<tr><td style="padding:0 28px 8px 28px;">'
+        '<table role="presentation" width="' + IW + '" cellpadding="0" cellspacing="0" border="0" style="width:' + IW + 'px;border-collapse:collapse;">'
+        + team_html_str +
+        '</table></td></tr></table>'
+
+        '<table role="presentation" width="' + str(INNER_W) + '" cellpadding="0" cellspacing="0" border="0" '
+        'style="width:' + str(INNER_W) + 'px;border-collapse:collapse;background:' + NAVY + ';border-radius:0 0 10px 10px;">'
+        '<tr>'
+        '<td width="310" style="width:310px;padding:15px 28px;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:' + TEAL + ';">carouselmedia.in &middot; Tasks synced to Trello</td>'
+        '<td width="310" align="right" style="width:310px;padding:15px 28px;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#A9C7D3;">Powered by Claude AI</td>'
+        '</tr></table>'
+
+        '</td></tr>'
+        '<tr><td height="26" style="height:26px;font-size:0;">&nbsp;</td></tr>'
+        '</table></center></body></html>'
+    )
 
 
 def get_gmail_service():
@@ -863,7 +891,6 @@ def send_email(html_content, team):
     recipients = [t["Email"] for t in team if t.get("Email")]
     date_str = TODAY.strftime("%d %b %Y")
     subject = f"Carousel Media Daily Report | {date_str}"
-
     msg = MIMEMultipart("alternative")
     msg["From"] = GMAIL_SENDER
     msg["To"] = recipients[0]
@@ -871,209 +898,32 @@ def send_email(html_content, team):
         msg["Cc"] = ", ".join(recipients[1:])
     msg["Subject"] = subject
     msg.attach(MIMEText(html_content, "html"))
-
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
     service.users().messages().send(userId="me", body={"raw": raw}).execute()
-    print(f"✅ Email sent to {', '.join(recipients)}")
-
-
-def generate_account_dna(account_name, insights, summary, thresholds):
-    """Generate first-draft DNA for an account based on 30D data."""
-    thresh = thresholds.get(account_name, {})
-    l30 = summary.get("last_30d", {})
-    l7 = summary.get("last_7d", {})
-    
-    campaigns_30d = insights.get("last_30d", [])
-    top_campaigns = sorted(campaigns_30d, 
-                          key=lambda x: float(x.get("spend", 0)), 
-                          reverse=True)[:5]
-    
-    campaign_summary = []
-    for c in top_campaigns:
-        spend = float(c.get("spend", 0))
-        if spend > 0:
-            revenue = extract_revenue(c.get("action_values", []))
-            roas = round(revenue / spend, 2) if spend > 0 else 0
-            campaign_summary.append(f"{c.get('campaign_name', 'Unknown')}: ₹{spend:,.0f} spend, {roas}x ROAS")
-    
-    prompt = f"""You are analysing a Meta ads account for a performance marketing agency in India.
-Based on the 30-day performance data below, write a concise Account DNA — permanent institutional knowledge about this account.
-
-Account: {account_name}
-ROAS Goal: {thresh.get("ROAS Goal", 2.0)}x
-CAC Goal: ₹{thresh.get("CAC Goal", 500)}
-
-30D Summary:
-- Spend: ₹{l30.get("spend", 0):,.0f}
-- ROAS: {l30.get("roas", 0)}x
-- CPM: ₹{l30.get("cpm", 0):,.0f}
-- CPC: ₹{l30.get("cpc", 0):,.0f}
-- CTR: {l30.get("ctr", 0)}%
-- Purchases: {l30.get("purchases", 0)}
-
-7D Summary:
-- Spend: ₹{l7.get("spend", 0):,.0f}
-- ROAS: {l7.get("roas", 0)}x
-- CPM: ₹{l7.get("cpm", 0):,.0f}
-
-Top Campaigns by Spend (30D):
-{chr(10).join(campaign_summary)}
-
-Write the Account DNA as 5-8 bullet points covering:
-- What product/campaign types perform best on ROAS
-- Typical CPM and CPC benchmarks for this account
-- Known patterns (audience fatigue speed, best performing windows, etc.)
-- Any structural notes about campaign setup
-- Current performance trajectory (improving/declining/stable)
-
-Keep it under 200 words. Write in plain text with bullet points starting with -
-This will be read by an AI every morning as permanent context, so be specific and factual."""
-
-    try:
-        response = claude.messages.create(
-            model="claude-sonnet-4-5",
-            max_tokens=500,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response.content[0].text.strip()
-    except Exception as e:
-        return f"DNA generation failed: {e}"
-
-
-def generate_weekly_digest(account_name, insights, summary, alerts, claude_insights_history):
-    """Generate weekly digest — runs every Sunday."""
-    l7 = summary.get("last_7d", {})
-    l30 = summary.get("last_30d", {})
-    
-    prompt = f"""You are summarising the last 7 days of Meta ads performance for {account_name}.
-
-7D Performance:
-- Spend: ₹{l7.get("spend", 0):,.0f}
-- ROAS: {l7.get("roas", 0)}x
-- CPM: ₹{l7.get("cpm", 0):,.0f} (30D avg: ₹{l30.get("cpm", 0):,.0f})
-- CPC: ₹{l7.get("cpc", 0):,.0f} (30D avg: ₹{l30.get("cpc", 0):,.0f})
-- CTR: {l7.get("ctr", 0)}% (30D avg: {l30.get("ctr", 0)}%)
-- Purchases: {l7.get("purchases", 0)}
-
-Alerts flagged this week: {len(alerts)}
-{chr(10).join([a.get("message", "") for a in alerts])}
-
-Write a 100-150 word weekly digest covering:
-- What happened this week (performance up/down/stable + why)
-- Key signals observed (fatigue, scaling opportunity, creative issues)
-- What was actioned (if anything visible in the data)
-- What to watch next week
-
-Plain text, past tense, factual. No bullet points — write as a paragraph.
-This replaces last week's digest and will be read as context next week."""
-
-    try:
-        response = claude.messages.create(
-            model="claude-sonnet-4-5",
-            max_tokens=300,
-            messages=[{"role": "user", "content": prompt}]
-        )
-        return response.content[0].text.strip()
-    except Exception as e:
-        return f"Digest generation failed: {e}"
-
-
-def save_dna_to_sheets(account_name, dna_text, sheets_id, refresh_token, client_id, client_secret):
-    """Save generated DNA back to Google Sheet."""
-    try:
-        creds = Credentials(
-            token=None,
-            refresh_token=refresh_token,
-            client_id=client_id,
-            client_secret=client_secret,
-            token_uri="https://oauth2.googleapis.com/token",
-            scopes=[
-                "https://www.googleapis.com/auth/gmail.send",
-                "https://www.googleapis.com/auth/spreadsheets"
-            ]
-        )
-        creds.refresh(Request())
-        gc = gspread.authorize(creds)
-        sh = gc.open_by_key(sheets_id)
-        ws = sh.worksheet("Account DNA")
-        
-        # Find existing row or add new one
-        records = ws.get_all_records()
-        for i, r in enumerate(records):
-            if r.get("Account Name") == account_name:
-                row_num = i + 2  # +2 for header and 0-index
-                ws.update(f"B{row_num}", [[dna_text]])
-                ws.update(f"C{row_num}", [[TODAY.strftime("%Y-%m-%d")]])
-                print(f"   Updated DNA for {account_name}")
-                return
-        
-        # Add new row if not found
-        ws.append_row([account_name, dna_text, TODAY.strftime("%Y-%m-%d")])
-        print(f"   Added DNA for {account_name}")
-    except Exception as e:
-        print(f"   Could not save DNA: {e}")
-
-
-def save_digest_to_sheets(account_name, digest_text, sheets_id, refresh_token, client_id, client_secret):
-    """Save weekly digest back to Google Sheet."""
-    try:
-        creds = Credentials(
-            token=None,
-            refresh_token=refresh_token,
-            client_id=client_id,
-            client_secret=client_secret,
-            token_uri="https://oauth2.googleapis.com/token",
-            scopes=[
-                "https://www.googleapis.com/auth/gmail.send",
-                "https://www.googleapis.com/auth/spreadsheets"
-            ]
-        )
-        creds.refresh(Request())
-        gc = gspread.authorize(creds)
-        sh = gc.open_by_key(sheets_id)
-        ws = sh.worksheet("Weekly Digest")
-        
-        records = ws.get_all_records()
-        week_of = TODAY.strftime("%Y-%m-%d")
-        
-        for i, r in enumerate(records):
-            if r.get("Account Name") == account_name:
-                row_num = i + 2
-                ws.update(f"B{row_num}", [[digest_text]])
-                ws.update(f"C{row_num}", [[week_of]])
-                ws.update(f"D{row_num}", [["Auto-generated"]])
-                print(f"   Updated digest for {account_name}")
-                return
-        
-        ws.append_row([account_name, digest_text, week_of, "Auto-generated"])
-        print(f"   Added digest for {account_name}")
-    except Exception as e:
-        print(f"   Could not save digest: {e}")
+    print(f"Email sent to {', '.join(recipients)}")
 
 
 def main():
-    print(f"🚀 Starting Carousel Media Daily Report — {TODAY}")
-    print("📊 Loading config from Google Sheets...")
+    print(f"Starting Carousel Media Daily Report - {TODAY}")
+    print("Loading config from Google Sheets...")
     accounts, thresholds, prompts, team, dna, digests, open_actions = load_config()
-    print(f"   Loaded {len(accounts)} active accounts, {len(team)} team members")
+    print(f"Loaded {len(accounts)} active accounts, {len(team)} team members")
 
     all_results = []
     for account in accounts:
         account_id = str(account["Meta Account ID"]).replace("act_", "")
         account_name = account["Account Name"]
-        print(f"   Pulling data for {account_name}...")
+        print(f"Pulling data for {account_name}...")
         try:
             insights = get_all_insights(account_id)
             summary = compute_account_summary(insights)
             alerts = detect_anomalies(account_name, summary, thresholds)
-            print(f"   Analysing {account_name} with Claude...")
+            print(f"Analysing {account_name} with Claude...")
             account_dna = dna.get(account_name, "")
             account_digest = digests.get(account_name, "")
             claude_insights = analyse_account(
                 account, insights, summary, thresholds, prompts,
-                dna=account_dna,
-                digest=account_digest,
-                open_actions=open_actions
+                dna=account_dna, digest=account_digest, open_actions=open_actions
             )
             pacing = calculate_pacing(account_name, summary, thresholds)
             all_results.append({
@@ -1086,58 +936,53 @@ def main():
                 "pacing": pacing
             })
         except Exception as e:
-            print(f"   ⚠️ Error processing {account_name}: {e}")
+            print(f"Error processing {account_name}: {e}")
             all_results.append({
                 "account_name": account_name,
                 "account": account,
+                "raw_insights": {},
                 "summary": {},
                 "alerts": [],
-                "claude_insights": {"insights": []}
+                "claude_insights": {"insights": []},
+                "pacing": None
             })
 
-    # Auto-generate DNA for accounts that don't have it yet
-    print("🧬 Checking Account DNA...")
+    # Auto-generate DNA if missing
+    print("Checking Account DNA...")
     for result in all_results:
         account_name = result["account_name"]
         if not dna.get(account_name) and result["summary"].get("last_30d", {}).get("spend", 0) > 0:
-            print(f"   Generating DNA for {account_name}...")
+            print(f"Generating DNA for {account_name}...")
             generated_dna = generate_account_dna(
-                account_name, result.get("raw_insights", {}), 
+                account_name, result["raw_insights"],
                 result["summary"], thresholds
             )
-            save_dna_to_sheets(
-                account_name, generated_dna, SHEETS_ID,
-                GMAIL_REFRESH_TOKEN, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET
-            )
+            save_to_sheet(account_name, "Account DNA", generated_dna, TODAY.strftime("%Y-%m-%d"))
 
-    # Generate weekly digest every Sunday
-    if TODAY.weekday() == 6:  # 6 = Sunday
-        print("📅 Sunday — generating weekly digests...")
+    # Sunday digest
+    if TODAY.weekday() == 6:
+        print("Sunday - generating weekly digests...")
         for result in all_results:
             account_name = result["account_name"]
             if result["summary"].get("last_7d", {}).get("spend", 0) > 0:
-                print(f"   Generating digest for {account_name}...")
+                print(f"Generating digest for {account_name}...")
                 generated_digest = generate_weekly_digest(
-                    account_name, result.get("raw_insights", {}),
-                    result["summary"], result["alerts"], []
+                    account_name, result["raw_insights"],
+                    result["summary"], result["alerts"]
                 )
-                save_digest_to_sheets(
-                    account_name, generated_digest, SHEETS_ID,
-                    GMAIL_REFRESH_TOKEN, GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET
-                )
+                save_to_sheet(account_name, "Weekly Digest", generated_digest,
+                              TODAY.strftime("%Y-%m-%d"), "Auto-generated")
 
-    print("📋 Creating Trello cards...")
+    print("Creating Trello cards...")
     try:
         create_tasks_in_trello(all_results, team)
     except Exception as e:
-        print(f"   ⚠️ Trello error: {e}")
+        print(f"Trello error: {e}")
 
-    print("📧 Building and sending HTML email...")
+    print("Building and sending HTML email...")
     html = build_html_email(all_results, team, thresholds)
-    total_alerts = sum(len(r.get("alerts", [])) for r in all_results)
-    high_alerts = sum(len([a for a in r.get("alerts", []) if a["severity"] == "high"]) for r in all_results)
     send_email(html, team)
-    print("✅ Done!")
+    print("Done!")
 
 
 if __name__ == "__main__":
