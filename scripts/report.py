@@ -499,14 +499,14 @@ def build_html_email(all_results, team, thresholds):
     BORDER = "#E8E8E8"
     EMAIL_W = 600
     INNER_W = 560
-    CLIENT_CARD_W = 250
+    CLIENT_CARD_W = 222
     CLIENT_GAP_W = 12
-    CLIENT_INNER_W = 222
-    METRIC_W = 105
+    CLIENT_INNER_W = 194
+    METRIC_W = 91
     METRIC_GAP_W = 12
-    TEAM_CARD_W = 250
+    TEAM_CARD_W = 222
     TEAM_GAP_W = 12
-    TEAM_INNER_W = 222
+    TEAM_INNER_W = 194
 
     def s(v):
         return escape(str(v)) if v is not None else ""
@@ -633,7 +633,7 @@ def build_html_email(all_results, team, thresholds):
         return (
             '<table role="presentation" width="' + str(CLIENT_CARD_W) + '" cellpadding="0" cellspacing="0" border="0" '
             'style="width:' + str(CLIENT_CARD_W) + 'px;border-collapse:separate;background:#FFFFFF;border:1px solid ' + BORDER + ';border-radius:8px;">'
-            '<tr><td style="background:' + ORANGE + ';border-radius:8px 8px 0 0;padding:14px;">'
+            '<tr><td style="background:' + ORANGE + ';border-radius:8px 8px 0 0;padding:12px 0 11px 0;">'
             '<table role="presentation" width="222" cellpadding="0" cellspacing="0" border="0" style="width:222px;border-collapse:collapse;">'
             '<tr>'
             '<td width="150" style="width:150px;">'
@@ -644,7 +644,7 @@ def build_html_email(all_results, team, thresholds):
             '<span style="display:inline-block;background:' + sbg + ';color:' + sc + ';font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:900;padding:4px 9px;border-radius:14px;">' + s(sl) + '</span>'
             '</td>'
             '</tr></table></td></tr>'
-            '<tr><td style="padding:14px;background:#FFFFFF;">'
+            '<tr><td style="padding:12px 14px;background:#FFFFFF;">'
             '<table role="presentation" width="' + str(CLIENT_INNER_W) + '" cellpadding="0" cellspacing="0" border="0" style="width:' + str(CLIENT_INNER_W) + 'px;border-collapse:collapse;">'
             '<tr>'
             + metric_box("ROAS (Yesterday)", rfmt(acct.get("roas_y",0)), roas_sub, rc, raw_sub=True)
@@ -700,17 +700,17 @@ def build_html_email(all_results, team, thresholds):
         if tasks:
             task_html = "".join(task_row(t) for t in tasks)
             body = (
-                '<tr><td style="padding:10px 14px 14px 14px;">'
+                '<tr><td style="padding:10px 0 14px 0;">'
                 '<table role="presentation" width="' + str(TEAM_INNER_W) + '" cellpadding="0" cellspacing="0" border="0" style="width:' + str(TEAM_INNER_W) + 'px;border-collapse:collapse;">'
                 + task_html + '</table></td></tr>'
             )
         else:
-            body = '<tr><td style="padding:18px 14px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999;font-style:italic;">All good &mdash; no action needed today.</td></tr>'
+            body = '<tr><td style="padding:18px 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999;font-style:italic;">All good &mdash; no action needed today.</td></tr>'
 
         return (
             '<table role="presentation" width="' + str(TEAM_CARD_W) + '" cellpadding="0" cellspacing="0" border="0" '
             'style="width:' + str(TEAM_CARD_W) + 'px;border-collapse:separate;background:#FFFFFF;border:1px solid ' + BORDER + ';border-radius:8px;">'
-            '<tr><td style="background:' + NAVY + ';border-radius:8px 8px 0 0;padding:13px 14px;">'
+            '<tr><td style="background:' + NAVY + ';border-radius:8px 8px 0 0;padding:12px 0;">'
             '<table role="presentation" width="' + str(TEAM_INNER_W) + '" cellpadding="0" cellspacing="0" border="0" style="width:' + str(TEAM_INNER_W) + 'px;border-collapse:collapse;">'
             '<tr>'
             '<td width="42" valign="middle" style="width:42px;">'
