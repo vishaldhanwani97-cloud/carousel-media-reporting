@@ -499,14 +499,14 @@ def build_html_email(all_results, team, thresholds):
     BORDER = "#E8E8E8"
     EMAIL_W = 600
     INNER_W = 560
-    CLIENT_CARD_W = 250
-    CLIENT_GAP_W = 12
-    CLIENT_INNER_W = 222
-    METRIC_W = 105
+    CARD_W = 512
+    CARD_PAD = 16
+    CARD_INNER_W = 480
+    METRIC_W = 234
     METRIC_GAP_W = 12
-    TEAM_CARD_W = 250
+    TEAM_CARD_W = 247
     TEAM_GAP_W = 12
-    TEAM_INNER_W = 222
+    TEAM_INNER_W = 220
 
     def s(v):
         return escape(str(v)) if v is not None else ""
