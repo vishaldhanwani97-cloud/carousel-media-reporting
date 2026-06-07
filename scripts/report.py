@@ -499,14 +499,14 @@ def build_html_email(all_results, team, thresholds):
     BORDER = "#E8E8E8"
     EMAIL_W = 600
     INNER_W = 560
-    CLIENT_CARD_W = 222
+    CLIENT_CARD_W = 250
     CLIENT_GAP_W = 12
-    CLIENT_INNER_W = 194
-    METRIC_W = 91
+    CLIENT_INNER_W = 222
+    METRIC_W = 105
     METRIC_GAP_W = 12
-    TEAM_CARD_W = 222
+    TEAM_CARD_W = 250
     TEAM_GAP_W = 12
-    TEAM_INNER_W = 194
+    TEAM_INNER_W = 222
 
     def s(v):
         return escape(str(v)) if v is not None else ""
@@ -921,7 +921,7 @@ def build_html_email(all_results, team, thresholds):
         '<table role="presentation" width="' + str(INNER_W) + '" cellpadding="0" cellspacing="0" border="0" '
         'style="width:' + str(INNER_W) + 'px;border-collapse:collapse;background:' + NAVY + ';border-radius:0 0 10px 10px;">'
         '<tr>'
-        '<td width="310" style="width:310px;padding:15px 28px;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:' + TEAL + ';">carouselmedia.in &middot; Tasks synced to Trello</td>'
+        '<td width="224" style="width:224px;padding:15px 28px;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:' + TEAL + ';">carouselmedia.in &middot; Tasks synced to Trello</td>'
         '<td width="224" align="right" style="width:224px;padding:15px 28px;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#A9C7D3;">Powered by Claude AI</td>'
         '</tr></table>'
 
