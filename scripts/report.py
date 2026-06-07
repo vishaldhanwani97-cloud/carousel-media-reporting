@@ -622,8 +622,8 @@ def build_html_email(all_results, team, thresholds):
                 '<tr><td style="padding:11px 14px 13px 14px;background:#FAFAFA;border-top:1px solid #EEE;font-family:Arial,Helvetica,sans-serif;">'
                 '<div style="font-size:10px;color:#A1A1A1;font-weight:900;text-transform:uppercase;letter-spacing:.9px;margin-bottom:9px;">'
                 'June Pacing &mdash; Day ' + s(p.get("days_elapsed","")) + ' of ' + s(p.get("days_in_month","")) + '</div>'
-                '<table role="presentation" width="' + str(CLIENT_INNER_W) + '" cellpadding="0" cellspacing="0" border="0" '
-                'style="width:' + str(CLIENT_INNER_W) + 'px;border-collapse:collapse;"><tr>'
+                '<table role="presentation" width="' + str(CARD_INNER_W) + '" cellpadding="0" cellspacing="0" border="0" '
+                'style="width:' + str(CARD_INNER_W) + 'px;border-collapse:collapse;"><tr>'
                 + pacing_block("Budget", p.get("budget_pacing_pct",0), p.get("expected_pct",0), p.get("budget_color", ORANGE))
                 + '<td width="' + str(METRIC_GAP_W) + '" style="width:' + str(METRIC_GAP_W) + 'px;font-size:0;">&nbsp;</td>'
                 + pacing_block("Revenue", p.get("revenue_pacing_pct",0), p.get("expected_pct",0), p.get("revenue_color", ORANGE))
@@ -631,21 +631,21 @@ def build_html_email(all_results, team, thresholds):
             )
 
         return (
-            '<table role="presentation" width="' + str(CLIENT_CARD_W) + '" cellpadding="0" cellspacing="0" border="0" '
-            'style="width:' + str(CLIENT_CARD_W) + 'px;border-collapse:separate;background:#FFFFFF;border:1px solid ' + BORDER + ';border-radius:8px;">'
-            '<tr><td style="background:' + ORANGE + ';border-radius:8px 8px 0 0;padding:12px 0 11px 0;">'
-            '<table role="presentation" width="222" cellpadding="0" cellspacing="0" border="0" style="width:222px;border-collapse:collapse;">'
+            '<table role="presentation" width="' + str(CARD_W) + '" cellpadding="0" cellspacing="0" border="0" '
+            'style="width:' + str(CARD_W) + 'px;border-collapse:separate;background:#FFFFFF;border:1px solid ' + BORDER + ';border-radius:8px;">'
+            '<tr><td style="background:' + ORANGE + ';border-radius:8px 8px 0 0;padding:14px 16px;">'
+            '<table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:480px;border-collapse:collapse;">'
             '<tr>'
-            '<td width="150" style="width:150px;">'
+            '<td width="380" style="width:380px;">'
             '<div style="font-size:14px;color:#FFF;font-weight:900;font-family:Arial,Helvetica,sans-serif;">' + s(acct.get("account_name")) + '</div>'
             '<div style="font-size:10px;color:#FFE0CF;font-weight:700;font-family:Arial,Helvetica,sans-serif;">' + s(acct.get("owner_name")) + ' &middot; Meta</div>'
             '</td>'
-            '<td width="72" align="right" style="width:72px;">'
+            '<td width="100" align="right" style="width:100px;">'
             '<span style="display:inline-block;background:' + sbg + ';color:' + sc + ';font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:900;padding:4px 9px;border-radius:14px;">' + s(sl) + '</span>'
             '</td>'
             '</tr></table></td></tr>'
-            '<tr><td style="padding:12px 14px;background:#FFFFFF;">'
-            '<table role="presentation" width="' + str(CLIENT_INNER_W) + '" cellpadding="0" cellspacing="0" border="0" style="width:' + str(CLIENT_INNER_W) + 'px;border-collapse:collapse;">'
+            '<tr><td style="padding:14px 16px;background:#FFFFFF;">'
+            '<table role="presentation" width="' + str(CARD_INNER_W) + '" cellpadding="0" cellspacing="0" border="0" style="width:' + str(CARD_INNER_W) + 'px;border-collapse:collapse;">'
             '<tr>'
             + metric_box("ROAS (Yesterday)", rfmt(acct.get("roas_y",0)), roas_sub, rc, raw_sub=True)
             + '<td width="' + str(METRIC_GAP_W) + '" style="width:' + str(METRIC_GAP_W) + 'px;font-size:0;">&nbsp;</td>'
@@ -657,8 +657,8 @@ def build_html_email(all_results, team, thresholds):
             + '</tr></table></td></tr>'
             + pacing_html
             + '<tr><td style="padding:0;border-radius:0 0 8px 8px;">'
-            '<table role="presentation" width="' + str(CLIENT_CARD_W) + '" cellpadding="0" cellspacing="0" border="0" '
-            'style="width:' + str(CLIENT_CARD_W) + 'px;border-collapse:collapse;background:' + ibg + ';border-radius:0 0 8px 8px;">'
+            '<table role="presentation" width="' + str(CARD_W) + '" cellpadding="0" cellspacing="0" border="0" '
+            'style="width:' + str(CARD_W) + 'px;border-collapse:collapse;background:' + ibg + ';border-radius:0 0 8px 8px;">'
             '<tr>'
             '<td width="4" style="width:4px;background:' + ic + ';font-size:0;">&nbsp;</td>'
             '<td style="padding:12px 14px;font-family:Arial,Helvetica,sans-serif;">'
@@ -674,9 +674,9 @@ def build_html_email(all_results, team, thresholds):
             right = account_card(accts[i+1]) if i+1 < len(accts) else ""
             rows.append(
                 '<tr>'
-                '<td width="' + str(CLIENT_CARD_W) + '" valign="top" style="width:' + str(CLIENT_CARD_W) + 'px;">' + left + '</td>'
-                '<td width="' + str(CLIENT_GAP_W) + '" style="width:' + str(CLIENT_GAP_W) + 'px;font-size:0;">&nbsp;</td>'
-                '<td width="' + str(CLIENT_CARD_W) + '" valign="top" style="width:' + str(CLIENT_CARD_W) + 'px;">' + right + '</td>'
+                '<td width="' + str(CARD_W) + '" valign="top" style="width:' + str(CARD_W) + 'px;">' + left + '</td>'
+                '<td width="' + str(TEAM_GAP_W) + '" style="width:' + str(TEAM_GAP_W) + 'px;font-size:0;">&nbsp;</td>'
+                '<td width="' + str(CARD_W) + '" valign="top" style="width:' + str(CARD_W) + 'px;">' + right + '</td>'
                 '</tr>'
                 '<tr><td colspan="3" height="14" style="height:14px;font-size:0;">&nbsp;</td></tr>'
             )
@@ -863,7 +863,7 @@ def build_html_email(all_results, team, thresholds):
     clients_html = account_rows(accounts)
     team_html_str = team_rows(team_list)
 
-    IW = '512'
+    IW = str(CARD_W)
 
     return (
         '<!doctype html><html><head>'
