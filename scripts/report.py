@@ -857,7 +857,7 @@ def build_html_email(all_results, team, thresholds):
         '</td></tr>'
 
         '<tr><td style="background:#FFFFFF;padding:16px 20px;border-top:1px solid #EEEEEE;">'
-        '<div style="font-size:9px;text-transform:uppercase;letter-spacing:1.6px;color:#999999;font-weight:900;margin-bottom:12px;">Today's War Room</div>'
+        '<div style="font-size:9px;text-transform:uppercase;letter-spacing:1.6px;color:#999999;font-weight:900;margin-bottom:12px;">Today&#39;s War Room</div>'
         + team_cards_html +
         '</td></tr>'
 
