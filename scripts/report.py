@@ -488,6 +488,7 @@ def save_to_sheet(account_name, tab_name, col_b, col_c, col_d=None):
 
 
 def build_html_email(all_results, team, thresholds):
+    from html import escape
     date_str = TODAY.strftime("%A, %d %B %Y")
     greeting, subtitle = generate_quirky_greeting(all_results, thresholds)
 
@@ -495,18 +496,6 @@ def build_html_email(all_results, team, thresholds):
     NAVY = "#08415C"
     TEAL = "#2AB6C9"
     BLACK = "#262626"
-    WHITE = "#F3F3F3"
-    BORDER = "#E8E8E8"
-    EMAIL_W = 600
-    INNER_W = 560
-    CARD_W = 512
-    CARD_PAD = 16
-    CARD_INNER_W = 480
-    METRIC_W = 234
-    METRIC_GAP_W = 12
-    TEAM_CARD_W = 247
-    TEAM_GAP_W = 12
-    TEAM_INNER_W = 220
 
     def s(v):
         return escape(str(v)) if v is not None else ""
@@ -514,238 +503,212 @@ def build_html_email(all_results, team, thresholds):
     def money(v):
         try:
             v = float(v or 0)
-            if v >= 10000000:
-                return "Rs" + f"{v/10000000:.2f}Cr"
-            if v >= 100000:
-                return "Rs" + f"{v/100000:.1f}L"
-            if v >= 1000:
-                return "Rs" + f"{v/1000:.1f}K"
+            if v >= 10000000: return "Rs" + f"{v/10000000:.1f}Cr"
+            if v >= 100000: return "Rs" + f"{v/100000:.1f}L"
+            if v >= 1000: return "Rs" + f"{v/1000:.1f}K"
             return "Rs" + f"{v:,.0f}"
         except Exception:
             return "Rs0"
 
     def num(v):
-        try:
-            return f"{int(float(v or 0)):,}"
-        except Exception:
-            return "0"
+        try: return f"{int(float(v or 0)):,}"
+        except Exception: return "0"
 
     def pct(v):
-        try:
-            return f"{float(v):.1f}%"
-        except Exception:
-            return "0%"
+        try: return f"{float(v):.1f}%"
+        except Exception: return "0%"
 
     def rfmt(v):
-        try:
-            return f"{float(v):.2f}x"
-        except Exception:
-            return "0.00x"
+        try: return f"{float(v):.2f}x"
+        except Exception: return "0.00x"
 
-    def bar_w(v, total):
+    def trend(today_val, prev_val):
         try:
-            return int(max(0, min(float(v), 100)) / 100 * total)
+            t = float(today_val or 0)
+            p = float(prev_val or 0)
+            if p == 0: return ""
+            chg = ((t - p) / p) * 100
+            arrow = "&#9650;" if chg >= 0 else "&#9660;"
+            color = "#168A43" if chg >= 0 else "#C0392B"
+            return '<span style="color:' + color + ';font-weight:900;">' + arrow + " " + str(round(abs(chg), 1)) + "%</span>"
         except Exception:
-            return 0
+            return ""
+
+    def bar(pct_val, color):
+        try:
+            w = max(0, min(int(float(pct_val or 0)), 100))
+        except Exception:
+            w = 0
+        return (
+            '<div style="background:#EFEFEF;height:5px;border-radius:3px;margin-bottom:3px;">'
+            '<div style="width:' + str(w) + '%;height:5px;border-radius:3px;background:' + color + ';"></div>'
+            '</div>'
+        )
 
     status_map = {
         "on_track": ("On Track", "#E9F8EF", "#15803D"),
-        "watch": ("Watch", "#FFF3E8", "#D96B12"),
-        "alert": ("Alert", "#FDECEC", "#C0392B"),
-        "no_data": ("No Data", "#EEEEEE", "#777777"),
+        "watch":    ("Watch",    "#FFF3E8", "#D96B12"),
+        "alert":    ("Alert",    "#FDECEC", "#C0392B"),
+        "no_data":  ("No Data",  "#EEEEEE", "#777777"),
     }
     insight_map = {
-        "fix": ("FIX IMMEDIATE", "#FDECEC", "#C0392B"),
-        "scale": ("SCALE OPPORTUNITY", "#E9F8EF", "#168A43"),
-        "watch": ("WATCH", "#FFF3E8", ORANGE),
-        None: ("NOTE", "#F7F7F7", "#999999"),
+        "fix":   ("FIX · IMMEDIATE",    "#FDECEC", "#C0392B"),
+        "scale": ("SCALE OPPORTUNITY",  "#E9F8EF", "#168A43"),
+        "watch": ("WATCH",              "#FFF3E8", "#D96B12"),
+        None:    ("NOTE",               "#F7F7F7", "#999999"),
     }
 
-    def metric_box(label, value, sub="", vc=BLACK, raw_sub=False):
-        sub_html = sub if raw_sub else s(sub)
+    def metric_td(label, value, sub=""):
         return (
-            '<td width="' + str(METRIC_W) + '" valign="top" style="width:' + str(METRIC_W) + 'px;">'
-            '<table role="presentation" width="' + str(METRIC_W) + '" cellpadding="0" cellspacing="0" border="0" '
-            'style="width:' + str(METRIC_W) + 'px;border-collapse:separate;background:#FFFFFF;border:1px solid ' + BORDER + ';border-radius:6px;">'
-            '<tr><td style="padding:10px;font-family:Arial,Helvetica,sans-serif;">'
-            '<div style="font-size:9px;text-transform:uppercase;color:#A5A5A5;font-weight:800;letter-spacing:.7px;">' + s(label) + '</div>'
-            '<div style="font-size:18px;color:' + vc + ';font-weight:900;margin-top:5px;">' + s(value) + '</div>'
-            '<div style="font-size:10px;color:#777;font-weight:700;margin-top:2px;">' + sub_html + '</div>'
-            '</td></tr></table></td>'
+            '<td style="padding:4px;">'
+            '<div style="background:#FAFAFA;border:1px solid #F0F0F0;border-radius:6px;padding:8px 10px;">'
+            '<div style="font-size:8px;text-transform:uppercase;letter-spacing:.7px;color:#A5A5A5;font-weight:800;margin-bottom:4px;">' + s(label) + '</div>'
+            '<div style="font-size:15px;font-weight:900;color:' + BLACK + ';margin-bottom:2px;">' + value + '</div>'
+            '<div style="font-size:9px;color:#777777;font-weight:700;">' + sub + '</div>'
+            '</div></td>'
         )
 
-    def pacing_block(label, pp, ep, color):
-        BAR = 124
-        fill = bar_w(pp, BAR)
-        empty = BAR - fill
-        return (
-            '<td width="' + str(METRIC_W) + '" valign="top" style="width:' + str(METRIC_W) + 'px;font-family:Arial,Helvetica,sans-serif;">'
-            '<div style="font-size:10px;color:#777;font-weight:700;margin-bottom:4px;">' + s(label) + '</div>'
-            '<table role="presentation" width="' + str(BAR) + '" cellpadding="0" cellspacing="0" border="0" '
-            'style="width:' + str(BAR) + 'px;border-collapse:collapse;background:#EFEFEF;">'
-            '<tr>'
-            '<td width="' + str(fill) + '" height="5" style="width:' + str(fill) + 'px;height:5px;background:' + s(color) + ';font-size:0;">&nbsp;</td>'
-            '<td width="' + str(empty) + '" height="5" style="width:' + str(empty) + 'px;height:5px;background:#EFEFEF;font-size:0;">&nbsp;</td>'
-            '</tr></table>'
-            '<div style="font-size:10px;color:' + s(color) + ';font-weight:900;margin-top:4px;">' + pct(pp) +
-            ' <span style="color:#999;font-weight:500;">exp. ' + pct(ep) + '</span></div>'
-            '</td>'
-        )
-
-    def account_card(acct):
+    def build_card(acct):
         st = acct.get("status", "no_data")
         sl, sbg, sc = status_map.get(st, status_map["no_data"])
         it = acct.get("insight_type")
         il, ibg, ic = insight_map.get(it, insight_map[None])
         p = acct.get("pacing") or {}
+
         try:
             rc = "#168A43" if float(acct.get("roas_y", 0)) >= float(acct.get("roas_goal", 0)) else "#C0392B"
         except Exception:
             rc = BLACK
 
-        def trend_tag(t):
-            if not t:
-                return ""
-            arrow = "&#9650;" if t["dir"] == "up" else "&#9660;"
-            color = "#168A43" if t["dir"] == "up" else "#C0392B"
-            return f'<span style="font-size:9px;color:{color};font-weight:900;">{arrow} {t["pct"]}%</span>'
+        roas_sub = "vs " + rfmt(acct.get("roas_goal", 0)) + " goal " + trend(acct.get("roas_y", 0), acct.get("roas_db", 0))
+        rev_sub = "Prev " + money(acct.get("revenue_db", 0)) + " " + trend(acct.get("revenue_y", 0), acct.get("revenue_db", 0))
+        spend_sub = "CTR " + pct(acct.get("ctr_y", 0))
+        purch_sub = "CPC Rs" + s(round(float(acct.get("cpc_y", 0) or 0), 0)) + " " + trend(acct.get("purchases_y", 0), acct.get("purchases_db", 0))
 
-        roas_sub = "vs " + rfmt(acct.get("roas_goal",0)) + " goal " + trend_tag(acct.get("roas_trend",""))
-        rev_sub = "Prev Rs" + str(round(float(acct.get("revenue_db",0))/1000,1)) + "K " + trend_tag(acct.get("revenue_trend",""))
-        spend_sub = "CTR " + pct(acct.get("ctr_y",0))
-        purch_sub = "CPC Rs" + s(acct.get("cpc_y",0)) + " " + trend_tag(acct.get("purchases_trend",""))
-        itxt = acct.get("insight_text") or "No critical action needed today."
+        roas_metric = (
+            '<td style="padding:4px;">'
+            '<div style="background:#FAFAFA;border:1px solid #F0F0F0;border-radius:6px;padding:8px 10px;">'
+            '<div style="font-size:8px;text-transform:uppercase;letter-spacing:.7px;color:#A5A5A5;font-weight:800;margin-bottom:4px;">ROAS (Yesterday)</div>'
+            '<div style="font-size:15px;font-weight:900;color:' + rc + ';margin-bottom:2px;">' + rfmt(acct.get("roas_y", 0)) + '</div>'
+            '<div style="font-size:9px;color:#777777;font-weight:700;">' + roas_sub + '</div>'
+            '</div></td>'
+        )
 
-        pacing_html = ""
         if p:
+            bp = p.get("budget_pacing_pct", 0)
+            rp = p.get("revenue_pacing_pct", 0)
+            ep = p.get("expected_pct", 0)
+            bc = p.get("budget_color", ORANGE)
+            rc2 = p.get("revenue_color", ORANGE)
             pacing_html = (
-                '<tr><td style="padding:11px 14px 13px 14px;background:#FAFAFA;border-top:1px solid #EEE;font-family:Arial,Helvetica,sans-serif;">'
-                '<div style="font-size:10px;color:#A1A1A1;font-weight:900;text-transform:uppercase;letter-spacing:.9px;margin-bottom:9px;">'
+                '<tr><td style="padding:10px 16px;background:#FAFAFA;border-top:1px solid #F0F0F0;">'
+                '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.9px;color:#A1A1A1;font-weight:900;margin-bottom:8px;">'
                 'June Pacing &mdash; Day ' + s(p.get("days_elapsed","")) + ' of ' + s(p.get("days_in_month","")) + '</div>'
-                '<table role="presentation" width="' + str(CARD_INNER_W) + '" cellpadding="0" cellspacing="0" border="0" '
-                'style="width:' + str(CARD_INNER_W) + 'px;border-collapse:collapse;"><tr>'
-                + pacing_block("Budget", p.get("budget_pacing_pct",0), p.get("expected_pct",0), p.get("budget_color", ORANGE))
-                + '<td width="' + str(METRIC_GAP_W) + '" style="width:' + str(METRIC_GAP_W) + 'px;font-size:0;">&nbsp;</td>'
-                + pacing_block("Revenue", p.get("revenue_pacing_pct",0), p.get("expected_pct",0), p.get("revenue_color", ORANGE))
-                + '</tr></table></td></tr>'
-            )
-
-        return (
-            '<table role="presentation" width="' + str(CARD_W) + '" cellpadding="0" cellspacing="0" border="0" '
-            'style="width:' + str(CARD_W) + 'px;border-collapse:separate;background:#FFFFFF;border:1px solid ' + BORDER + ';border-radius:8px;">'
-            '<tr><td style="background:' + ORANGE + ';border-radius:8px 8px 0 0;padding:14px 16px;">'
-            '<table role="presentation" width="480" cellpadding="0" cellspacing="0" border="0" style="width:480px;border-collapse:collapse;">'
-            '<tr>'
-            '<td width="380" style="width:380px;">'
-            '<div style="font-size:14px;color:#FFF;font-weight:900;font-family:Arial,Helvetica,sans-serif;">' + s(acct.get("account_name")) + '</div>'
-            '<div style="font-size:10px;color:#FFE0CF;font-weight:700;font-family:Arial,Helvetica,sans-serif;">' + s(acct.get("owner_name")) + ' &middot; Meta</div>'
-            '</td>'
-            '<td width="100" align="right" style="width:100px;">'
-            '<span style="display:inline-block;background:' + sbg + ';color:' + sc + ';font-family:Arial,Helvetica,sans-serif;font-size:10px;font-weight:900;padding:4px 9px;border-radius:14px;">' + s(sl) + '</span>'
-            '</td>'
-            '</tr></table></td></tr>'
-            '<tr><td style="padding:14px 16px;background:#FFFFFF;">'
-            '<table role="presentation" width="' + str(CARD_INNER_W) + '" cellpadding="0" cellspacing="0" border="0" style="width:' + str(CARD_INNER_W) + 'px;border-collapse:collapse;">'
-            '<tr>'
-            + metric_box("ROAS (Yesterday)", rfmt(acct.get("roas_y",0)), roas_sub, rc, raw_sub=True)
-            + '<td width="' + str(METRIC_GAP_W) + '" style="width:' + str(METRIC_GAP_W) + 'px;font-size:0;">&nbsp;</td>'
-            + metric_box("Revenue (Yesterday)", money(acct.get("revenue_y",0)), rev_sub, raw_sub=True)
-            + '</tr><tr><td colspan="3" height="8" style="height:8px;font-size:0;">&nbsp;</td></tr><tr>'
-            + metric_box("Spend (Yesterday)", money(acct.get("spend_y",0)), spend_sub)
-            + '<td width="' + str(METRIC_GAP_W) + '" style="width:' + str(METRIC_GAP_W) + 'px;font-size:0;">&nbsp;</td>'
-            + metric_box("Purchases (Yesterday)", num(acct.get("purchases_y",0)), purch_sub, raw_sub=True)
-            + '</tr></table></td></tr>'
-            + pacing_html
-            + '<tr><td style="padding:0;border-radius:0 0 8px 8px;">'
-            '<table role="presentation" width="' + str(CARD_W) + '" cellpadding="0" cellspacing="0" border="0" '
-            'style="width:' + str(CARD_W) + 'px;border-collapse:collapse;background:' + ibg + ';border-radius:0 0 8px 8px;">'
-            '<tr>'
-            '<td width="4" style="width:4px;background:' + ic + ';font-size:0;">&nbsp;</td>'
-            '<td style="padding:12px 14px;font-family:Arial,Helvetica,sans-serif;">'
-            '<div style="font-size:10px;color:' + ic + ';font-weight:900;text-transform:uppercase;letter-spacing:.8px;">' + s(il) + '</div>'
-            '<div style="font-size:11px;color:' + BLACK + ';font-weight:500;margin-top:5px;line-height:16px;">' + s(itxt) + '</div>'
-            '</td></tr></table></td></tr></table>'
-        )
-
-    def account_rows(accts):
-        rows = []
-        for i in range(0, len(accts), 2):
-            left = account_card(accts[i])
-            right = account_card(accts[i+1]) if i+1 < len(accts) else ""
-            rows.append(
+                '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">'
                 '<tr>'
-                '<td width="' + str(CARD_W) + '" valign="top" style="width:' + str(CARD_W) + 'px;">' + left + '</td>'
-                '<td width="' + str(TEAM_GAP_W) + '" style="width:' + str(TEAM_GAP_W) + 'px;font-size:0;">&nbsp;</td>'
-                '<td width="' + str(CARD_W) + '" valign="top" style="width:' + str(CARD_W) + 'px;">' + right + '</td>'
-                '</tr>'
-                '<tr><td colspan="3" height="14" style="height:14px;font-size:0;">&nbsp;</td></tr>'
-            )
-        return "".join(rows)
-
-    def task_row(task):
-        return (
-            '<tr>'
-            '<td width="16" valign="top" style="width:16px;padding:8px 0;">'
-            '<table role="presentation" width="7" cellpadding="0" cellspacing="0" border="0" style="width:7px;border-collapse:collapse;">'
-            '<tr><td width="7" height="7" style="width:7px;height:7px;background:' + s(task.get("color", ORANGE)) + ';border-radius:7px;font-size:0;">&nbsp;</td></tr>'
-            '</table></td>'
-            '<td width="74" valign="top" style="width:74px;padding:6px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:' + BLACK + ';font-weight:900;">' + s(task.get("account")) + '</td>'
-            '<td width="124" valign="top" style="width:124px;padding:6px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#555;">' + s(task.get("action")) + '</td>'
-            '<td width="40" align="right" valign="top" style="width:40px;padding:6px 0;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:' + ORANGE + ';font-weight:900;">' + s(task.get("deadline")) + '</td>'
-            '</tr>'
-        )
-
-    def team_card(member):
-        tasks = member.get("tasks") or []
-        if tasks:
-            task_html = "".join(task_row(t) for t in tasks)
-            body = (
-                '<tr><td style="padding:10px 0 14px 0;">'
-                '<table role="presentation" width="' + str(TEAM_INNER_W) + '" cellpadding="0" cellspacing="0" border="0" style="width:' + str(TEAM_INNER_W) + 'px;border-collapse:collapse;">'
-                + task_html + '</table></td></tr>'
+                '<td width="48%" style="padding-right:8px;">'
+                '<div style="font-size:9px;color:#777;font-weight:700;margin-bottom:3px;">Budget</div>'
+                + bar(bp, bc) +
+                '<div style="font-size:9px;font-weight:900;color:' + bc + ';">' + pct(bp) + ' <span style="color:#999;font-weight:500;">exp. ' + pct(ep) + '</span></div>'
+                '</td>'
+                '<td width="4%"></td>'
+                '<td width="48%">'
+                '<div style="font-size:9px;color:#777;font-weight:700;margin-bottom:3px;">Revenue</div>'
+                + bar(rp, rc2) +
+                '<div style="font-size:9px;font-weight:900;color:' + rc2 + ';">' + pct(rp) + ' <span style="color:#999;font-weight:500;">exp. ' + pct(ep) + '</span></div>'
+                '</td>'
+                '</tr></table>'
+                '</td></tr>'
             )
         else:
-            body = '<tr><td style="padding:18px 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999;font-style:italic;">All good &mdash; no action needed today.</td></tr>'
+            pacing_html = ""
+
+        insight_text = acct.get("insight_text") or "No critical action needed today."
 
         return (
-            '<table role="presentation" width="' + str(TEAM_CARD_W) + '" cellpadding="0" cellspacing="0" border="0" '
-            'style="width:' + str(TEAM_CARD_W) + 'px;border-collapse:separate;background:#FFFFFF;border:1px solid ' + BORDER + ';border-radius:8px;">'
-            '<tr><td style="background:' + NAVY + ';border-radius:8px 8px 0 0;padding:12px 0;">'
-            '<table role="presentation" width="' + str(TEAM_INNER_W) + '" cellpadding="0" cellspacing="0" border="0" style="width:' + str(TEAM_INNER_W) + 'px;border-collapse:collapse;">'
+            '<table width="100%" cellpadding="0" cellspacing="0" border="0" '
+            'style="width:100%;border-collapse:collapse;background:#FFFFFF;border:1px solid #E8E8E8;border-radius:8px;margin-bottom:12px;">'
+            '<tr><td style="background:' + ORANGE + ';border-radius:8px 8px 0 0;padding:12px 16px;">'
+            '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">'
             '<tr>'
-            '<td width="42" valign="middle" style="width:42px;">'
-            '<table role="presentation" width="32" cellpadding="0" cellspacing="0" border="0" style="width:32px;border-collapse:collapse;">'
-            '<tr><td width="32" height="32" align="center" valign="middle" '
-            'style="width:32px;height:32px;background:' + ORANGE + ';border-radius:32px;font-family:Arial,Helvetica,sans-serif;color:#FFF;font-size:11px;line-height:32px;font-weight:900;">'
-            + s(member.get("initials")) + '</td></tr></table></td>'
-            '<td valign="middle" style="padding-left:8px;">'
-            '<div style="font-size:14px;color:#FFF;font-weight:900;font-family:Arial,Helvetica,sans-serif;">' + s(member.get("name")) + '</div>'
-            '<div style="font-size:10px;color:' + TEAL + ';font-weight:700;font-family:Arial,Helvetica,sans-serif;margin-top:2px;">' + s(member.get("role")) + '</div>'
-            '</td></tr></table></td></tr>'
-            + body + '</table>'
+            '<td>'
+            '<div style="font-size:14px;font-weight:900;color:#FFFFFF;">' + s(acct.get("account_name","")) + '</div>'
+            '<div style="font-size:10px;color:rgba(255,255,255,0.8);font-weight:700;margin-top:2px;">' + s(acct.get("owner_name","")) + ' &middot; Meta</div>'
+            '</td>'
+            '<td align="right">'
+            '<span style="display:inline-block;background:' + sbg + ';color:' + sc + ';font-size:10px;font-weight:900;padding:4px 10px;border-radius:12px;">' + s(sl) + '</span>'
+            '</td>'
+            '</tr></table>'
+            '</td></tr>'
+            '<tr><td style="padding:8px;">'
+            '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">'
+            '<tr>'
+            + roas_metric
+            + metric_td("Revenue (Yesterday)", money(acct.get("revenue_y", 0)), rev_sub)
+            + metric_td("Spend (Yesterday)", money(acct.get("spend_y", 0)), spend_sub)
+            + metric_td("Purchases", num(acct.get("purchases_y", 0)), purch_sub)
+            + '</tr></table>'
+            '</td></tr>'
+            + pacing_html
+            + '<tr><td style="padding:0;border-top:1px solid #F0F0F0;">'
+            '<div style="background:' + ibg + ';border-left:3px solid ' + ic + ';padding:10px 16px;border-radius:0 0 8px 8px;">'
+            '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.8px;font-weight:900;color:' + ic + ';margin-bottom:4px;">' + s(il) + '</div>'
+            '<div style="font-size:11px;color:' + BLACK + ';line-height:1.5;">' + s(insight_text) + '</div>'
+            '</div></td></tr>'
+            '</table>'
         )
 
-    def team_rows(members):
-        rows = []
-        for i in range(0, len(members), 2):
-            left = team_card(members[i])
-            right = team_card(members[i+1]) if i+1 < len(members) else ""
-            rows.append(
-                '<tr>'
-                '<td width="' + str(TEAM_CARD_W) + '" valign="top" style="width:' + str(TEAM_CARD_W) + 'px;">' + left + '</td>'
-                '<td width="' + str(TEAM_GAP_W) + '" style="width:' + str(TEAM_GAP_W) + 'px;font-size:0;">&nbsp;</td>'
-                '<td width="' + str(TEAM_CARD_W) + '" valign="top" style="width:' + str(TEAM_CARD_W) + 'px;">' + right + '</td>'
-                '</tr>'
-                '<tr><td colspan="3" height="14" style="height:14px;font-size:0;">&nbsp;</td></tr>'
-            )
-        return "".join(rows)
+    def build_team_card(member):
+        initials = s(member.get("initials", ""))
+        name = s(member.get("name", ""))
+        role = s(member.get("role", ""))
+        tasks = member.get("tasks") or []
 
-    # Build data
+        if tasks:
+            task_rows = ""
+            for task in tasks:
+                task_rows += (
+                    '<tr><td style="padding:6px 12px;border-bottom:1px solid #F8F8F8;">'
+                    '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">'
+                    '<tr>'
+                    '<td width="8" valign="top" style="padding-top:4px;">'
+                    '<div style="width:6px;height:6px;border-radius:50%;background:' + s(task.get("color", ORANGE)) + ';"></div>'
+                    '</td>'
+                    '<td style="padding-left:6px;font-size:10px;font-weight:900;color:' + BLACK + ';white-space:nowrap;padding-right:6px;">' + s(task.get("account","")[:12]) + '</td>'
+                    '<td style="font-size:10px;color:#555555;line-height:1.4;">' + s(task.get("action","")[:80]) + '</td>'
+                    '<td align="right" style="font-size:9px;font-weight:900;color:' + ORANGE + ';white-space:nowrap;padding-left:6px;">' + s(task.get("deadline","")) + '</td>'
+                    '</tr></table>'
+                    '</td></tr>'
+                )
+            body = '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">' + task_rows + '</table>'
+        else:
+            body = '<div style="padding:14px 12px;font-size:10px;color:#999999;font-style:italic;">All good &mdash; no action needed today.</div>'
+
+        return (
+            '<table width="100%" cellpadding="0" cellspacing="0" border="0" '
+            'style="width:100%;border-collapse:collapse;background:#FFFFFF;border:1px solid #E8E8E8;border-radius:8px;overflow:hidden;">'
+            '<tr><td style="background:' + NAVY + ';padding:10px 12px;border-radius:8px 8px 0 0;">'
+            '<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">'
+            '<tr>'
+            '<td style="width:30px;">'
+            '<div style="width:28px;height:28px;border-radius:50%;background:' + ORANGE + ';text-align:center;line-height:28px;font-size:10px;font-weight:900;color:#FFFFFF;">' + initials + '</div>'
+            '</td>'
+            '<td style="padding-left:8px;">'
+            '<div style="font-size:12px;font-weight:900;color:#FFFFFF;">' + name + '</div>'
+            '<div style="font-size:9px;color:' + TEAL + ';margin-top:2px;">' + role + '</div>'
+            '</td>'
+            '</tr></table>'
+            '</td></tr>'
+            '<tr><td>' + body + '</td></tr>'
+            '</table>'
+        )
+
+    # Build accounts data
     accounts = []
     tasks_by_owner = {}
 
     for result in all_results:
-        s_data = result["summary"]
+        sd = result["summary"]
         account = result["account"]
         account_name = result["account_name"]
         thresh = thresholds.get(account_name, {})
@@ -753,16 +716,17 @@ def build_html_email(all_results, team, thresholds):
         owner_email = account.get("Owner", "")
         owner_name = next((t["Name"] for t in team if t["Email"] == owner_email), owner_email)
 
-        y = s_data.get("yesterday", {})
-        db = s_data.get("day_before", {})
-        l7 = s_data.get("last_7d", {})
+        y = sd.get("yesterday", {})
+        db = sd.get("day_before", {})
+        l7 = sd.get("last_7d", {})
         roas_7d = l7.get("roas", 0)
+        roas_y = y.get("roas", 0)
 
         if l7.get("spend", 0) == 0:
             status = "no_data"
-        elif roas_7d >= roas_goal:
+        elif roas_y >= roas_goal:
             status = "on_track"
-        elif roas_7d >= roas_goal * 0.8:
+        elif roas_y >= roas_goal * 0.8:
             status = "watch"
         else:
             status = "alert"
@@ -777,75 +741,49 @@ def build_html_email(all_results, team, thresholds):
             insight_type = "fix"
             insight_text = alerts_list[0]["message"]
         elif insights:
-            top = next((i for i in insights if i.get("type") in ["fix", "scale", "watch"]), None)
+            top = next((i for i in insights if i.get("type") in ["fix","scale","watch"]), None)
             if top:
                 insight_type = top.get("type")
-                insight_text = top.get("text", "")[:200]
-
-        def trend(today_val, prev_val):
-            try:
-                today_val = float(today_val or 0)
-                prev_val = float(prev_val or 0)
-                if prev_val == 0:
-                    return ""
-                change = ((today_val - prev_val) / prev_val) * 100
-                arrow = "up" if change >= 0 else "down"
-                return {"pct": round(abs(change), 1), "dir": arrow}
-            except Exception:
-                return ""
+                insight_text = top.get("text","")[:200]
 
         accounts.append({
             "account_name": account_name,
             "owner_name": owner_name,
             "status": status,
             "roas_goal": roas_goal,
-            # Yesterday as primary
-            "roas_y": y.get("roas", 0),
+            "roas_y": roas_y,
+            "roas_db": db.get("roas", 0),
             "revenue_y": y.get("revenue", 0),
+            "revenue_db": db.get("revenue", 0),
             "spend_y": y.get("spend", 0),
             "purchases_y": y.get("purchases", 0),
+            "purchases_db": db.get("purchases", 0),
             "ctr_y": y.get("ctr", 0),
             "cpc_y": y.get("cpc", 0),
-            # Day before for comparison
-            "roas_db": db.get("roas", 0),
-            "revenue_db": db.get("revenue", 0),
-            "spend_db": db.get("spend", 0),
-            "purchases_db": db.get("purchases", 0),
-            # Trends
-            "roas_trend": trend(y.get("roas",0), db.get("roas",0)),
-            "revenue_trend": trend(y.get("revenue",0), db.get("revenue",0)),
-            "spend_trend": trend(y.get("spend",0), db.get("spend",0)),
-            "purchases_trend": trend(y.get("purchases",0), db.get("purchases",0)),
-            # 7D for context
-            "roas_7d": roas_7d,
-            "roas_7d_val": l7.get("roas", 0),
             "pacing": pacing,
             "insight_type": insight_type,
             "insight_text": insight_text,
         })
 
         if owner_email not in tasks_by_owner:
-            role = next((t.get("Role", "") for t in team if t["Email"] == owner_email), "")
+            role = next((t.get("Role","") for t in team if t["Email"] == owner_email), "")
             initials = "".join([n[0].upper() for n in owner_name.split()[:2]])
-            tasks_by_owner[owner_email] = {
-                "name": owner_name, "initials": initials,
-                "role": role, "tasks": []
-            }
+            tasks_by_owner[owner_email] = {"name": owner_name, "initials": initials, "role": role, "tasks": []}
 
         if alerts_list:
             top = alerts_list[0]
             tasks_by_owner[owner_email]["tasks"].append({
                 "account": account_name[:12],
-                "action": top["message"][:90],
+                "action": top["message"][:80],
                 "deadline": "Now" if top["severity"] == "high" else "EOD",
                 "color": "#C0392B" if top["severity"] == "high" else "#D66A16"
             })
         elif insights:
-            top_ins = next((i for i in insights if i.get("type") in ["fix", "scale"]), None)
+            top_ins = next((i for i in insights if i.get("type") in ["fix","scale"]), None)
             if top_ins:
                 tasks_by_owner[owner_email]["tasks"].append({
                     "account": account_name[:12],
-                    "action": top_ins.get("text", "")[:90],
+                    "action": top_ins.get("text","")[:80],
                     "deadline": "EOD",
                     "color": "#C0392B" if top_ins.get("type") == "fix" else "#168A43"
                 })
@@ -855,80 +793,88 @@ def build_html_email(all_results, team, thresholds):
             tasks_by_owner[t["Email"]] = {
                 "name": t["Name"],
                 "initials": "".join([n[0].upper() for n in t["Name"].split()[:2]]),
-                "role": t.get("Role", ""),
+                "role": t.get("Role",""),
                 "tasks": []
             }
 
-    team_list = list(tasks_by_owner.values())
-    clients_html = account_rows(accounts)
-    team_html_str = team_rows(team_list)
+    cards_html = "".join(build_card(a) for a in accounts)
 
-    IW = str(CARD_W)
+    team_list = list(tasks_by_owner.values())
+    team_cards_html = ""
+    for i in range(0, len(team_list), 2):
+        left = build_team_card(team_list[i])
+        right = build_team_card(team_list[i+1]) if i+1 < len(team_list) else ""
+        team_cards_html += (
+            '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;margin-bottom:10px;">'
+            '<tr>'
+            '<td width="49%" valign="top" style="width:49%;padding-right:6px;">' + left + '</td>'
+            '<td width="2%" style="width:2%;"></td>'
+            '<td width="49%" valign="top" style="width:49%;padding-left:6px;">' + (right if right else "") + '</td>'
+            '</tr></table>'
+        )
 
     return (
         '<!doctype html><html><head>'
         '<meta charset="utf-8">'
         '<meta name="x-apple-disable-message-reformatting">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        '<title>Carousel Media Daily Report</title>'
         '</head>'
-        '<body style="margin:0;padding:0;background:' + WHITE + ';font-family:Arial,Helvetica,sans-serif;">'
-        '<center style="width:100%;background:' + WHITE + ';">'
-        '<table role="presentation" width="' + str(EMAIL_W) + '" cellpadding="0" cellspacing="0" border="0" '
-        'style="width:' + str(EMAIL_W) + 'px;border-collapse:collapse;background:' + WHITE + ';">'
-        '<tr><td style="padding:14px 20px 0 20px;">'
+        '<body style="margin:0;padding:0;background:#F0F0F0;font-family:Arial,Helvetica,sans-serif;">'
+        '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#F0F0F0;">'
+        '<tr><td align="center" style="padding:16px 12px;">'
+        '<table width="600" cellpadding="0" cellspacing="0" border="0" style="width:600px;max-width:600px;border-collapse:collapse;">'
 
-        '<table role="presentation" width="' + str(INNER_W) + '" cellpadding="0" cellspacing="0" border="0" '
-        'style="width:' + str(INNER_W) + 'px;border-collapse:collapse;background:' + NAVY + ';border-radius:10px 10px 0 0;">'
+        '<tr><td style="background:' + NAVY + ';border-radius:8px 8px 0 0;padding:16px 20px;">'
+        '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">'
         '<tr>'
-        '<td width="272" valign="middle" style="width:272px;padding:24px;font-family:Arial,Helvetica,sans-serif;">'
-        '<table role="presentation" width="224" cellpadding="0" cellspacing="0" border="0" style="width:224px;border-collapse:collapse;">'
+        '<td valign="middle">'
+        '<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">'
         '<tr>'
-        '<td width="58" valign="middle" style="width:58px;">'
-        '<table role="presentation" width="42" cellpadding="0" cellspacing="0" border="0" style="width:42px;border-collapse:collapse;">'
-        '<tr><td width="42" height="42" align="center" valign="middle" '
-        'style="width:42px;height:42px;background:' + ORANGE + ';border-radius:8px;font-family:Arial,Helvetica,sans-serif;color:#FFF;font-size:23px;line-height:42px;font-weight:900;">C</td></tr>'
-        '</table></td>'
-        '<td valign="middle" style="padding-left:10px;">'
-        '<div style="font-size:21px;color:#FFF;font-weight:900;letter-spacing:.4px;">CAROUSEL MEDIA</div>'
-        '<div style="font-size:11px;color:' + TEAL + ';font-weight:900;letter-spacing:1.1px;text-transform:uppercase;margin-top:3px;">Daily Performance Report</div>'
-        '</td></tr></table></td>'
-        '<td width="192" align="right" valign="middle" style="width:192px;padding:24px;font-family:Arial,Helvetica,sans-serif;">'
-        '<div style="font-size:14px;color:#FFF;font-weight:900;">' + escape(date_str) + '</div>'
-        '<div style="font-size:11px;color:' + TEAL + ';font-weight:700;margin-top:6px;">Generated 8:00 AM IST</div>'
-        '</td></tr></table>'
-
-        '<table role="presentation" width="' + str(INNER_W) + '" cellpadding="0" cellspacing="0" border="0" '
-        'style="width:' + str(INNER_W) + 'px;border-collapse:collapse;background:' + ORANGE + ';">'
-        '<tr><td align="center" style="padding:16px 0 15px 0;font-family:Arial,Helvetica,sans-serif;">'
-        '<div style="font-size:15px;color:#FFF;font-weight:900;">' + escape(greeting) + '</div>'
-        '<div style="font-size:12px;color:#FFE2D1;font-weight:800;margin-top:4px;">' + escape(subtitle) + '</div>'
-        '</td></tr></table>'
-
-        '<table role="presentation" width="' + str(INNER_W) + '" cellpadding="0" cellspacing="0" border="0" '
-        'style="width:' + str(INNER_W) + 'px;border-collapse:collapse;background:#FFFFFF;">'
-        '<tr><td style="padding:22px 24px 12px 24px;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999;font-weight:900;text-transform:uppercase;letter-spacing:1.6px;">Client Snapshots</td></tr>'
-        '<tr><td style="padding:0 24px 4px 24px;">'
-        '<table role="presentation" width="' + IW + '" cellpadding="0" cellspacing="0" border="0" style="width:' + IW + 'px;border-collapse:collapse;">'
-        + clients_html +
-        '</table></td></tr>'
-        '<tr><td style="padding:18px 24px 12px 24px;border-top:1px solid #EEE;font-family:Arial,Helvetica,sans-serif;font-size:11px;color:#999;font-weight:900;text-transform:uppercase;letter-spacing:1.6px;">Today\'s War Room</td></tr>'
-        '<tr><td style="padding:0 24px 8px 24px;">'
-        '<table role="presentation" width="' + IW + '" cellpadding="0" cellspacing="0" border="0" style="width:' + IW + 'px;border-collapse:collapse;">'
-        + team_html_str +
-        '</table></td></tr></table>'
-
-        '<table role="presentation" width="' + str(INNER_W) + '" cellpadding="0" cellspacing="0" border="0" '
-        'style="width:' + str(INNER_W) + 'px;border-collapse:collapse;background:' + NAVY + ';border-radius:0 0 10px 10px;">'
-        '<tr>'
-        '<td width="224" style="width:224px;padding:15px 28px;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:' + TEAL + ';">carouselmedia.in &middot; Tasks synced to Trello</td>'
-        '<td width="224" align="right" style="width:224px;padding:15px 28px;font-family:Arial,Helvetica,sans-serif;font-size:10px;color:#A9C7D3;">Powered by Claude AI</td>'
+        '<td style="width:44px;vertical-align:middle;">'
+        '<div style="width:38px;height:38px;background:' + ORANGE + ';border-radius:6px;text-align:center;line-height:38px;font-size:20px;font-weight:900;color:#FFFFFF;">C</div>'
+        '</td>'
+        '<td style="padding-left:10px;vertical-align:middle;">'
+        '<div style="font-size:17px;font-weight:900;color:#FFFFFF;letter-spacing:.3px;">CAROUSEL MEDIA</div>'
+        '<div style="font-size:9px;font-weight:900;color:' + TEAL + ';text-transform:uppercase;letter-spacing:1px;margin-top:3px;">Daily Performance Report</div>'
+        '</td>'
         '</tr></table>'
-
+        '</td>'
+        '<td align="right" valign="middle">'
+        '<div style="font-size:13px;font-weight:900;color:#FFFFFF;">' + escape(date_str) + '</div>'
+        '<div style="font-size:10px;color:' + TEAL + ';margin-top:4px;">Generated 8:00 AM IST</div>'
+        '</td>'
+        '</tr></table>'
         '</td></tr>'
-        '<tr><td height="26" style="height:26px;font-size:0;">&nbsp;</td></tr>'
-        '</table></center></body></html>'
+
+        '<tr><td style="background:' + ORANGE + ';padding:14px 20px;text-align:center;">'
+        '<div style="font-size:14px;font-weight:900;color:#FFFFFF;">' + escape(greeting) + '</div>'
+        '<div style="font-size:11px;color:rgba(255,255,255,0.85);font-weight:700;margin-top:4px;">' + escape(subtitle) + '</div>'
+        '</td></tr>'
+
+        '<tr><td style="background:#FFFFFF;padding:16px 20px 8px 20px;">'
+        '<div style="font-size:9px;text-transform:uppercase;letter-spacing:1.6px;color:#999999;font-weight:900;margin-bottom:12px;">Client Snapshots</div>'
+        + cards_html +
+        '</td></tr>'
+
+        '<tr><td style="background:#FFFFFF;padding:16px 20px;border-top:1px solid #EEEEEE;">'
+        '<div style="font-size:9px;text-transform:uppercase;letter-spacing:1.6px;color:#999999;font-weight:900;margin-bottom:12px;">Today's War Room</div>'
+        + team_cards_html +
+        '</td></tr>'
+
+        '<tr><td style="background:' + NAVY + ';border-radius:0 0 8px 8px;padding:12px 20px;">'
+        '<table width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;">'
+        '<tr>'
+        '<td style="font-size:10px;color:' + TEAL + ';">carouselmedia.in &middot; Tasks synced to Trello</td>'
+        '<td align="right" style="font-size:10px;color:rgba(255,255,255,0.5);">Powered by Claude AI</td>'
+        '</tr></table>'
+        '</td></tr>'
+
+        '</table>'
+        '</td></tr></table>'
+        '</body></html>'
     )
+
+
 
 
 def get_gmail_service():
