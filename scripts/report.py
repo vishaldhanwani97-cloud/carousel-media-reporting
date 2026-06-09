@@ -461,6 +461,16 @@ def create_tasks_in_trello(all_results, team):
         "BeAvake":            "6a27b1901fe25744efaf0e2e",
         "Sashays":            "6a27b190abea8949db148152",
         "Aarjavee":           "6a27b191c89a825e2beb10bd",
+        "Tales&Stories":      "6a27f3e9340e1e2455be255b",
+        "7th Avenue":         "6a27f3eacad5e14161331c29",
+        "Activeat":           "6a27f3ea104e4cb6fdc91b0b",
+        "Nirjara":            "6a27f3eb74b0e0fbbfc324e4",
+        "YuGap":              "6a27f3eb249fe9bb3d06eac7",
+        "Little GrownUps":    "6a27f3ec0ae9079db8af27ae",
+        "Dolcy":              "6a27f3ec4eaee16b4838cfce",
+        "Raw Spiritual":      "6a27f3edc816fc427f9d7ce3",
+        "Style Pop":          "6a27f3ed740c151a404d984a",
+        "ShriAum":            "6a27f3ee8fe4967baa89674c",
     }
 
     # Routing — who owns what type
