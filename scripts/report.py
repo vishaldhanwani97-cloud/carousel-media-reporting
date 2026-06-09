@@ -357,6 +357,13 @@ def create_tasks_in_trello(all_results, team):
         "Iktara Lifestyle":   "6a27b01352e5d084ea40b8da",
         "Kiko Riko":          "6a27b014da32e84b036cfdfd",
         "The Classy Kitchen": "6a27b014d6070db2626013dc",
+        "Adawwrably":         "6a27b18e957ba41e2458c7e9",
+        "Tribal Veda":        "6a27b18e5eeb86d3e5ba0e1c",
+        "Lonnue":             "6a27b18f677e5af38e3e7f76",
+        "Cookie Co.":         "6a27b18fe2362dec373653e9",
+        "BeAvake":            "6a27b1901fe25744efaf0e2e",
+        "Sashays":            "6a27b190abea8949db148152",
+        "Aarjavee":           "6a27b191c89a825e2beb10bd",
     }
 
     # Routing — who owns what type
