@@ -334,24 +334,214 @@ def create_trello_card(list_id, title, description):
 
 
 def create_tasks_in_trello(all_results, team):
-    todo_list_id = get_trello_list_id("To Do")
-    if not todo_list_id:
-        return
+    """Create rich Trello cards with labels, checklists, auto-assign and routing."""
     date_str = TODAY.strftime("%d %b %Y")
+
+    # List IDs
+    LIST_IDS = {
+        "incoming":  "6a27b0107f0513b539185df1",
+        "urgent":    "6a27b00f4cd09b8c4280da1b",
+    }
+
+    # Label IDs — type
+    TYPE_LABELS = {
+        "alert":    "6a27b011755fdf4737cd0d96",
+        "scale":    "6a27b011b39d569d65cd8836",
+        "creative": "6a27b01233b453c71efd22f0",
+        "strategy": "6a27b0125eeb6f5ece9ed984",
+        "comms":    "6a27b0135717f13905e3eafa",
+    }
+
+    # Label IDs — account
+    ACCOUNT_LABELS = {
+        "Iktara Lifestyle":   "6a27b01352e5d084ea40b8da",
+        "Kiko Riko":          "6a27b014da32e84b036cfdfd",
+        "The Classy Kitchen": "6a27b014d6070db2626013dc",
+    }
+
+    # Routing — who owns what type
+    def get_owner_email(insight_type, severity):
+        if severity == "high":
+            return next((t["Email"] for t in team if t.get("Name") == "Vishal"), None)
+        if insight_type in ["fix", "alert"]:
+            return next((t["Email"] for t in team if t.get("Name") == "Kathan"), None)
+        if insight_type == "scale":
+            return next((t["Email"] for t in team if t.get("Name") == "Devanshi"), None)
+        if insight_type == "strategy":
+            return next((t["Email"] for t in team if t.get("Name") == "Nikhil"), None)
+        return None
+
+    def get_trello_member_id(email):
+        """Get Trello member ID from email."""
+        try:
+            r = requests.get(
+                f"https://api.trello.com/1/members/{email}",
+                params={"key": TRELLO_KEY, "token": TRELLO_TOKEN_VAL}
+            )
+            if r.status_code == 200:
+                return r.json().get("id")
+        except Exception:
+            pass
+        return None
+
+    def create_card(list_id, title, desc, label_ids, due_date=None, member_ids=None):
+        data = {
+            "key": TRELLO_KEY,
+            "token": TRELLO_TOKEN_VAL,
+            "idList": list_id,
+            "name": title,
+            "desc": desc,
+        }
+        if label_ids:
+            data["idLabels"] = ",".join(label_ids)
+        if due_date:
+            data["due"] = due_date
+        if member_ids:
+            data["idMembers"] = ",".join(member_ids)
+        r = requests.post("https://api.trello.com/1/cards", params=data)
+        return r.json() if r.status_code == 200 else None
+
+    def add_checklist(card_id, checklist_name, items):
+        r = requests.post(
+            "https://api.trello.com/1/checklists",
+            params={
+                "key": TRELLO_KEY,
+                "token": TRELLO_TOKEN_VAL,
+                "idCard": card_id,
+                "name": checklist_name
+            }
+        )
+        if r.status_code != 200:
+            return
+        checklist_id = r.json()["id"]
+        for item in items:
+            requests.post(
+                f"https://api.trello.com/1/checklists/{checklist_id}/checkItems",
+                params={
+                    "key": TRELLO_KEY,
+                    "token": TRELLO_TOKEN_VAL,
+                    "name": item
+                }
+            )
+
+    from datetime import timezone
+    due_today = datetime.now(IST).replace(hour=23, minute=59).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    due_tomorrow = (datetime.now(IST) + timedelta(days=1)).replace(hour=23, minute=59).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
     for result in all_results:
         account_name = result["account_name"]
-        owner_email = result["account"].get("Owner", "")
-        owner_name = next((t["Name"] for t in team if t["Email"] == owner_email), owner_email)
-        for insight in result.get("claude_insights", {}).get("insights", []):
-            if insight.get("type") in ["fix", "scale"]:
-                title = f"{account_name} - {insight.get('title', 'Action')} | {date_str}"
-                desc = f"Account: {account_name}\nOwner: {owner_name}\nType: {insight.get('type','').upper()}\n\n{insight.get('text','')}\n\nAuto-generated {date_str}"
-                create_trello_card(todo_list_id, title, desc)
-        for alert in result.get("alerts", []):
-            if alert["severity"] == "high":
-                title = f"{account_name} - {alert['metric']} Alert | {date_str}"
-                desc = f"Account: {account_name}\nOwner: {owner_name}\nAlert: {alert['message']}\n\nAuto-generated {date_str}"
-                create_trello_card(todo_list_id, title, desc)
+        s = result["summary"]
+        l7 = s.get("last_7d", {})
+        y = s.get("yesterday", {})
+        alerts_list = result.get("alerts", [])
+        insights = result.get("claude_insights", {}).get("insights", [])
+        account_label = ACCOUNT_LABELS.get(account_name)
+
+        # Process alerts
+        for alert in alerts_list:
+            severity = alert["severity"]
+            metric = alert.get("metric", "Metric")
+            message = alert["message"]
+            list_id = LIST_IDS["urgent"] if severity == "high" else LIST_IDS["incoming"]
+            due = due_today if severity == "high" else due_tomorrow
+
+            owner_email = get_owner_email("alert", severity)
+            member_ids = []
+            if owner_email:
+                mid = get_trello_member_id(owner_email)
+                if mid:
+                    member_ids = [mid]
+
+            label_ids = [TYPE_LABELS["alert"]]
+            if account_label:
+                label_ids.append(account_label)
+
+            title = f"{account_name} — {metric} Alert | {date_str}"
+
+            desc = f"""## 📊 Trigger
+{message}
+
+## 🔍 Diagnosis
+- ROAS Yesterday: {y.get('roas', 0)}x (7D: {l7.get('roas', 0)}x)
+- Spend Yesterday: ₹{y.get('spend', 0):,.0f}
+- CPM (7D): ₹{l7.get('cpm', 0):,.0f}
+- CTR (7D): {l7.get('ctr', 0)}%
+
+## 🛠 Fix Options
+- Pause underperforming ad sets and consolidate budget
+- Refresh creative — new hooks/angles needed
+- Check if any ad sets exited learning phase recently
+
+## 📈 Expected Outcome
+ROAS recovery within 48-72h if creative fatigue is the cause.
+
+## 💬 Client Comms Template
+Hi [Client], we noticed [metric] has shifted this week. We're actively monitoring and have a plan ready — will keep you updated.
+
+---
+*Auto-generated by Carousel Media Reporting System*"""
+
+            card = create_card(list_id, title, desc, label_ids, due, member_ids)
+            if card and card.get("id"):
+                add_checklist(card["id"], "Action Steps", [
+                    "Review affected campaigns in Ads Manager",
+                    "Identify root cause (creative / audience / budget)",
+                    "Implement fix",
+                    "Monitor for 24h",
+                    "Update client if needed"
+                ])
+                print(f"   Created alert card: {title}")
+
+        # Process scale/fix insights
+        for insight in insights:
+            itype = insight.get("type")
+            if itype not in ["fix", "scale", "strategy"]:
+                continue
+
+            owner_email = get_owner_email(itype, "medium")
+            member_ids = []
+            if owner_email:
+                mid = get_trello_member_id(owner_email)
+                if mid:
+                    member_ids = [mid]
+
+            type_label = TYPE_LABELS.get(itype, TYPE_LABELS["strategy"])
+            label_ids = [type_label]
+            if account_label:
+                label_ids.append(account_label)
+
+            emoji = "🔥" if itype == "fix" else "📈" if itype == "scale" else "🧠"
+            title = f"{account_name} — {emoji} {insight.get('title', itype.title())} | {date_str}"
+
+            desc = f"""## 📊 Trigger
+{insight.get('text', '')}
+
+## 🔍 Context
+- ROAS (7D): {l7.get('roas', 0)}x
+- Revenue (7D): ₹{l7.get('revenue', 0):,.0f}
+- Spend (7D): ₹{l7.get('spend', 0):,.0f}
+
+## 🛠 Recommended Action
+{insight.get('action', 'Review account and take appropriate action.')}
+
+## 📈 Expected Outcome
+{insight.get('expected_outcome', 'Improvement in account performance within 3-5 days.')}
+
+## 💬 Client Comms Template
+Hi [Client], we've identified an opportunity to [improve/fix] [area]. Here's what we're planning to do...
+
+---
+*Auto-generated by Carousel Media Reporting System*"""
+
+            card = create_card(LIST_IDS["incoming"], title, desc, label_ids, due_tomorrow, member_ids)
+            if card and card.get("id"):
+                checklist_items = ["Review data", "Plan action", "Execute", "Monitor results"]
+                if itype == "scale":
+                    checklist_items = ["Confirm ROAS stable 3+ days", "Identify winning ad set", "Duplicate with +20-30% budget", "Monitor for 48h"]
+                elif itype == "fix":
+                    checklist_items = ["Identify root cause", "Pause underperformers", "Launch fix", "Verify improvement in 24h"]
+                add_checklist(card["id"], "Action Steps", checklist_items)
+                print(f"   Created {itype} card: {title}")
 
 
 def generate_quirky_greeting(all_results, thresholds):
