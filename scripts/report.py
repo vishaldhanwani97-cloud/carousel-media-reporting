@@ -473,30 +473,28 @@ def create_tasks_in_trello(all_results, team):
         "ShriAum":            "6a27f3ee8fe4967baa89674c",
     }
 
+    # Hardcoded Trello member IDs
+    TRELLO_MEMBERS = {
+        "vishal@carouselmedia.in":   "65d87c065fe10d11ab2e58bd",
+        "nikhil@carouselmedia.in":   "6a27b427eadd05f8b309b7ad",
+        "kathan@carouselmedia.in":   "6a27b5102fafe8f2aea056db",
+        "devanshi@carouselmedia.in": "6a27b47a5c3c53d31d0abe8a",
+    }
+
     # Routing — who owns what type
     def get_owner_email(insight_type, severity):
         if severity == "high":
-            return next((t["Email"] for t in team if t.get("Name") == "Vishal"), None)
+            return "vishal@carouselmedia.in"
         if insight_type in ["fix", "alert"]:
-            return next((t["Email"] for t in team if t.get("Name") == "Kathan"), None)
+            return "kathan@carouselmedia.in"
         if insight_type == "scale":
-            return next((t["Email"] for t in team if t.get("Name") == "Devanshi"), None)
+            return "devanshi@carouselmedia.in"
         if insight_type == "strategy":
-            return next((t["Email"] for t in team if t.get("Name") == "Nikhil"), None)
+            return "nikhil@carouselmedia.in"
         return None
 
     def get_trello_member_id(email):
-        """Get Trello member ID from email."""
-        try:
-            r = requests.get(
-                f"https://api.trello.com/1/members/{email}",
-                params={"key": TRELLO_KEY, "token": TRELLO_TOKEN_VAL}
-            )
-            if r.status_code == 200:
-                return r.json().get("id")
-        except Exception:
-            pass
-        return None
+        return TRELLO_MEMBERS.get(email)
 
     def create_card(list_id, title, desc, label_ids, due_date=None, member_ids=None):
         data = {
